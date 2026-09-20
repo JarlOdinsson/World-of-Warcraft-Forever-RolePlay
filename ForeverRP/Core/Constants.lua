@@ -1,0 +1,50 @@
+local Addon = ForeverRP
+
+Addon.Constants = {
+    ADDON_NAME = "ForeverRP",
+    ADDON_DISPLAY_NAME = "ForeverRP",
+    PROTOCOL_VERSION = 1,
+    DATABASE_VERSION = 1,
+    COMMUNICATION_PREFIX = "FOREVERRP",
+    MAX_MESSAGE_BYTES = 240,
+    PROFILE_CHUNK_BYTES = 180,
+    MAX_PROFILE_ENCODED_BYTES = 42000,
+    MAX_PROFILE_CHUNKS = 234,
+    PROFILE_TRANSFER_TIMEOUT = 30,
+    PRESENCE_EXPIRY_SECONDS = 900,
+    DISCOVERY_RADII = { 10, 15, 20, 25, 30 },
+    DEFAULT_DISCOVERY_RADIUS = 20,
+    PRIVACY_MODES = { "visible", "restricted", "hidden" },
+    DEFAULT_PRIVACY_MODE = "visible",
+    PROFILE_STATUSES = { "IC", "OOC", "AFK", "DND" },
+    PROFILE_FIELD_ORDER = {
+        "rpName",
+        "title",
+        "race",
+        "class",
+        "age",
+        "pronouns",
+        "status",
+        "currently",
+        "atAGlance",
+        "description",
+        "history",
+        "oocNotes",
+    },
+    PROFILE_LIMITS = {
+        rpName = 64,
+        title = 128,
+        race = 64,
+        class = 64,
+        age = 32,
+        pronouns = 64,
+        currently = 256,
+        atAGlance = 1024,
+        description = 4000,
+        history = 6000,
+        oocNotes = 2000,
+    },
+}
+
+local getMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+Addon.Constants.ADDON_VERSION = getMetadata and getMetadata("ForeverRP", "Version") or "development"

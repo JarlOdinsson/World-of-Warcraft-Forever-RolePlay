@@ -1,0 +1,65 @@
+name: Feature request
+description: Suggest an improvement or new ForeverRP feature
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping shape ForeverRP. Please focus on the player problem first, then the proposed solution.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature area
+      options:
+        - RP profiles
+        - Nearby discovery
+        - Notifications
+        - Tooltips
+        - Privacy
+        - Minimap / UI
+        - Profile sharing / communication
+        - Settings
+        - Accessibility / usability
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Explain the player need or limitation.
+      placeholder: As a player, I want to... because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe how you think ForeverRP should handle it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Are there other ways this could be handled?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, examples, related addons, or other useful context.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked existing issues for a similar request.
+          required: true
+        - label: This request is related to ForeverRP's roleplay/social functionality.
+          required: true

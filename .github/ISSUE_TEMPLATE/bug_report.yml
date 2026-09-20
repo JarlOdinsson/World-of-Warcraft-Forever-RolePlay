@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a problem with ForeverRP
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping test ForeverRP. Please include enough detail for the issue to be reproduced.
+
+        **Do not include private RP profile text, account information, or other sensitive data unless it is necessary to reproduce the bug.**
+
+  - type: input
+    id: addon_version
+    attributes:
+      label: ForeverRP version
+      description: The version shown by `/frp version`.
+      placeholder: 0.1.0-beta
+    validations:
+      required: true
+
+  - type: input
+    id: wow_version
+    attributes:
+      label: World of Warcraft Forever version
+      description: Include the client/build number if available.
+      placeholder: 1.60.1 / build 69913
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area affected
+      options:
+        - Minimap button / UI
+        - RP profile editor
+        - Profile viewer
+        - Nearby discovery / range
+        - Notifications
+        - Tooltips
+        - Privacy settings
+        - Profile sharing / communication
+        - Settings / SavedVariables
+        - Slash commands
+        - Packaging / installation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+      placeholder: Tell us what broke and what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps that cause the issue.
+      placeholder: |
+        1. Open ForeverRP from the minimap button
+        2. Go to ...
+        3. Click ...
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: lua_error
+    attributes:
+      label: Lua error / debug output
+      description: Paste any relevant Lua error or ForeverRP debug output. Use a code block if possible.
+      render: shell
+
+  - type: textarea
+    id: addons
+    attributes:
+      label: Other addons enabled
+      description: List any other addons that may interact with UI, tooltips, nameplates, or chat communication.
+      placeholder: None / addon names
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reproduced this on the latest available ForeverRP beta.
+          required: true
+        - label: I checked existing issues for the same problem.
+          required: true
+        - label: I removed private or sensitive information from logs/screenshots.
+          required: true

@@ -2,6 +2,12 @@
 
 All notable user-facing changes to ForeverRP will be documented here.
 
+## 0.1.1-beta
+
+### Changed
+
+- Updated compatibility for WoW: Forever 1.60.1 build 70170 (Interface 16001).
+
 ## 0.1.0-beta
 
 ### Added
@@ -51,5 +57,5 @@ All notable user-facing changes to ForeverRP will be documented here.
 ### Notes
 
 - Prepared and validated the `0.1.0-beta` CurseForge archive.
-- Interface `11601` verified against Forever beta client build `1.60.1.69913` and installed Forever-specific addon metadata.
+- Initial Forever-specific interface metadata was verified against the then-current beta client and installed addon metadata.
 - The CurseForge game-version identifier, project ID, and final in-game test pass remain release prerequisites.

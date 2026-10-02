@@ -4,11 +4,11 @@ ForeverRP is planned as a roleplaying profile and proximity-based RP discovery a
 
 ## Current status
 
-Version `0.1.0-beta` provides local RP profiles, a minimap-first interface, a live Nearby browser, configurable discovery feedback, bounded profile exchange, account-wide discovery privacy, and player-tooltip integration. Remote profiles remain runtime-only.
+Version `0.1.1-beta` provides local RP profiles, a minimap-first interface, a live Nearby browser, configurable discovery feedback, bounded profile exchange, account-wide discovery privacy, and player-tooltip integration. Remote profiles remain runtime-only.
 
 ## Supported client
 
-ForeverRP targets World of Warcraft Forever only. Interface `11601` was verified against Forever beta client build `1.60.1.69913` and Forever-specific project TOCs. The matching CurseForge game-version identifier still requires confirmation. No compatibility with Retail, Classic Era, Cataclysm, TBC, or other client flavors is claimed.
+ForeverRP targets World of Warcraft Forever only. Interface `16001` targets Forever beta client `1.60.1.70170`. The matching CurseForge game-version identifier still requires confirmation. No compatibility with Retail, Classic Era, Cataclysm, TBC, or other client flavors is claimed.
 
 ## Installation
 

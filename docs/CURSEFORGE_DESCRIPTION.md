@@ -31,7 +31,7 @@ Profiles are sent only after an explicit request from a confirmed, privacy-quali
 
 World of Warcraft Forever is the sole intended target. Compatibility with other WoW flavors is not claimed.
 
-This beta targets Interface `11601`, verified against Forever beta client build `1.60.1.69913`.
+This beta targets Interface `16001` for Forever beta client `1.60.1.70170`.
 
 ## First-beta limitations
 

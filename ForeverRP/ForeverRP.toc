@@ -1,8 +1,8 @@
-## Interface: 11601
+## Interface: 16001
 ## Title: ForeverRP
 ## Notes: Roleplaying profiles and proximity-based RP discovery for World of Warcraft Forever.
 ## Author: JarlOdinsson
-## Version: 0.1.0-beta
+## Version: 0.1.1-beta
 ## SavedVariables: ForeverRPDB
 ## SavedVariablesPerCharacter: ForeverRPCharacterDB
 

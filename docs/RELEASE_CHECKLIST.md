@@ -2,8 +2,8 @@
 
 ## Release metadata
 
-- [x] Confirm version `0.1.0-beta` in `ForeverRP/ForeverRP.toc` and `CHANGELOG.md`.
-- [x] Set Interface `11601`, verified from beta client build `1.60.1.69913` and Forever-specific TOCs.
+- [x] Confirm version `0.1.1-beta` in `ForeverRP/ForeverRP.toc` and `CHANGELOG.md`.
+- [x] Set Interface `16001`, targeting beta client build `1.60.1.70170`.
 - [x] Verify title, notes, author, and SavedVariables declarations.
 - [ ] Verify the matching CurseForge game version.
 - [x] Select and approve the MIT License for public distribution.

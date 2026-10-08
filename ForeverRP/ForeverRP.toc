@@ -12,6 +12,8 @@ Core.lua
 Core\Database.lua
 Profile\Profile.lua
 Profile\RemoteProfiles.lua
+Modules\Connections.lua
+Modules\EmoteBar\EmoteBar.lua
 Discovery\Presence.lua
 Discovery\Privacy.lua
 Discovery\Communication.lua
@@ -25,6 +27,8 @@ UI\Settings.lua
 Profile\ProfileEditor.lua
 Profile\ProfileViewer.lua
 UI\Nearby.lua
+UI\Connections.lua
+UI\EmoteConfig.lua
 UI\MainWindow.lua
 UI\MinimapButton.lua
 Core\Commands.lua

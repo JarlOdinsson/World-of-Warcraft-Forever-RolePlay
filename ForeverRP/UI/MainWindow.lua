@@ -89,9 +89,11 @@ function UI:CreateMainWindow()
 
     self.panels.home = self:CreateHomePanel(content)
     self.panels.nearby = Addon.NearbyUI:Create(content)
+    self.panels.connections = Addon.ConnectionsUI:Create(content)
     self.panels.profile = Addon.ProfileEditor:Create(content)
     self.panels.viewer = Addon.ProfileViewer:Create(content)
     self.panels.settings = self:CreateSettingsPanel(content)
+    self.panels.emotes = Addon.EmoteConfigUI:Create(content)
 
     self.homeButton = CreateNavigationButton(navigation, Addon:GetText("NAV_HOME"), navTitle, function()
         self:ShowPanel("home")
@@ -99,7 +101,10 @@ function UI:CreateMainWindow()
     self.nearbyButton = CreateNavigationButton(navigation, Addon:GetText("NAV_NEARBY"), self.homeButton, function()
         self:ShowPanel("nearby")
     end)
-    self.profileButton = CreateNavigationButton(navigation, Addon:GetText("NAV_PROFILE"), self.nearbyButton, function()
+    self.connectionsButton = CreateNavigationButton(navigation, Addon:GetText("NAV_CONNECTIONS"), self.nearbyButton, function()
+        self:ShowPanel("connections")
+    end)
+    self.profileButton = CreateNavigationButton(navigation, Addon:GetText("NAV_PROFILE"), self.connectionsButton, function()
         self:ShowPanel("profile")
     end)
     self.viewerButton = CreateNavigationButton(navigation, Addon:GetText("NAV_VIEWER"), self.profileButton, function()
@@ -146,6 +151,10 @@ function UI:ShowPanel(panelName)
         Addon.ProfileEditor:Refresh()
     elseif selected == "nearby" then
         Addon.NearbyUI:Refresh()
+    elseif selected == "connections" then
+        Addon.ConnectionsUI:Refresh()
+    elseif selected == "emotes" then
+        Addon.EmoteConfigUI:Refresh()
     elseif selected == "viewer" then
         Addon.ProfileViewer:Refresh()
     end

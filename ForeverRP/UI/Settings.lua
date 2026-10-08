@@ -117,6 +117,76 @@ function Addon.UI:CreateSettingsPanel(parent)
         Addon.Database:SetNotificationSetting("chat", button:GetChecked())
     end)
 
+    local emoteTitle = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    emoteTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 310, -318)
+    emoteTitle:SetText(Addon:GetText("SETTINGS_EMOTE_BAR"))
+
+    local emoteEnabled = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+    emoteEnabled:SetPoint("TOPLEFT", emoteTitle, "BOTTOMLEFT", -4, -6)
+    SetCheckButtonText(emoteEnabled, Addon:GetText("SETTINGS_EMOTE_ENABLED"))
+    emoteEnabled:SetScript("OnClick", function(button)
+        Addon.EmoteBar:SetEnabled(button:GetChecked())
+    end)
+
+    local emoteLocked = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+    emoteLocked:SetPoint("LEFT", emoteEnabled, "RIGHT", 98, 0)
+    SetCheckButtonText(emoteLocked, Addon:GetText("SETTINGS_EMOTE_LOCKED"))
+    emoteLocked:SetScript("OnClick", function(button)
+        Addon.EmoteBar:SetLocked(button:GetChecked())
+    end)
+
+    local slotDropdown = CreateFrame("Frame", "ForeverRPEmoteCountDropdown", panel, "UIDropDownMenuTemplate")
+    slotDropdown:SetPoint("TOPLEFT", emoteEnabled, "BOTTOMLEFT", -16, -4)
+    UIDropDownMenu_SetWidth(slotDropdown, 70)
+    UIDropDownMenu_Initialize(slotDropdown, function(_, level)
+        for count = 1, 12 do
+            local value = count
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = string.format(Addon:GetText("EMOTE_SLOT_COUNT"), value)
+            info.value = value
+            info.checked = Addon.EmoteBar:GetSettings().slots == value
+            info.func = function()
+                Addon.EmoteBar:SetSlots(value)
+                Addon.UI:RefreshSettings()
+            end
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end)
+
+    local scaleDropdown = CreateFrame("Frame", "ForeverRPEmoteScaleDropdown", panel, "UIDropDownMenuTemplate")
+    scaleDropdown:SetPoint("LEFT", slotDropdown, "RIGHT", 70, 0)
+    UIDropDownMenu_SetWidth(scaleDropdown, 72)
+    UIDropDownMenu_Initialize(scaleDropdown, function(_, level)
+        for _, scale in ipairs(Addon.Constants.EMOTE_BAR_SCALES) do
+            local value = scale
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = string.format("%d%%", value * 100)
+            info.value = value
+            info.checked = Addon.EmoteBar:GetSettings().scale == value
+            info.func = function()
+                Addon.EmoteBar:SetScale(value)
+                Addon.UI:RefreshSettings()
+            end
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end)
+
+    local configure = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    configure:SetSize(100, 24)
+    configure:SetPoint("TOPLEFT", slotDropdown, "BOTTOMLEFT", 20, -4)
+    configure:SetText(Addon:GetText("SETTINGS_EMOTE_CONFIGURE"))
+    configure:SetScript("OnClick", function()
+        Addon.UI:ShowPanel("emotes")
+    end)
+
+    local reset = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    reset:SetSize(100, 24)
+    reset:SetPoint("LEFT", configure, "RIGHT", 8, 0)
+    reset:SetText(Addon:GetText("SETTINGS_EMOTE_RESET"))
+    reset:SetScript("OnClick", function()
+        Addon.EmoteBar:ResetPosition()
+    end)
+
     panel.debugCheck = debugCheck
     panel.minimapCheck = minimapCheck
     panel.discoveryCheck = discoveryCheck
@@ -125,6 +195,10 @@ function Addon.UI:CreateSettingsPanel(parent)
     panel.pulseCheck = pulseCheck
     panel.soundCheck = soundCheck
     panel.chatCheck = chatCheck
+    panel.emoteEnabled = emoteEnabled
+    panel.emoteLocked = emoteLocked
+    panel.emoteSlotDropdown = slotDropdown
+    panel.emoteScaleDropdown = scaleDropdown
     self.settingsPanel = panel
     return panel
 end
@@ -147,4 +221,12 @@ function Addon.UI:RefreshSettings()
     self.settingsPanel.pulseCheck:SetChecked(notifications.minimapPulse)
     self.settingsPanel.soundCheck:SetChecked(notifications.sound)
     self.settingsPanel.chatCheck:SetChecked(notifications.chat)
+    local emoteBar = Addon.EmoteBar:GetSettings()
+    self.settingsPanel.emoteEnabled:SetChecked(emoteBar.enabled)
+    self.settingsPanel.emoteLocked:SetChecked(emoteBar.locked)
+    UIDropDownMenu_SetSelectedValue(self.settingsPanel.emoteSlotDropdown, emoteBar.slots)
+    UIDropDownMenu_SetText(self.settingsPanel.emoteSlotDropdown,
+        string.format(Addon:GetText("EMOTE_SLOT_COUNT"), emoteBar.slots))
+    UIDropDownMenu_SetSelectedValue(self.settingsPanel.emoteScaleDropdown, emoteBar.scale)
+    UIDropDownMenu_SetText(self.settingsPanel.emoteScaleDropdown, string.format("%d%%", emoteBar.scale * 100))
 end

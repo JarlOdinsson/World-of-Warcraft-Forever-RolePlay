@@ -53,6 +53,44 @@ function Viewer:Create(parent)
     contextLabel:SetPoint("LEFT", title, "RIGHT", 10, 0)
     contextLabel:SetText(Addon:GetText("PROFILE_VIEWER_LOCAL"))
 
+    local remember = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+    remember:SetSize(92, 22)
+    remember:SetPoint("TOPLEFT", 4, -34)
+    remember:SetScript("OnClick", function()
+        if not self.remoteCharacterKey then
+            return
+        end
+        local simulated = self.includeSimulated == true
+        if Addon.Connections:Get(self.remoteCharacterKey, simulated) then
+            Addon.Connections:Forget(self.remoteCharacterKey, simulated)
+        else
+            Addon.Connections:Remember(self.remoteCharacterKey, simulated)
+        end
+        self:RefreshConnectionActions()
+    end)
+
+    local favorite = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+    favorite:SetSize(92, 22)
+    favorite:SetPoint("LEFT", remember, "RIGHT", 6, 0)
+    favorite:SetScript("OnClick", function()
+        if self.remoteCharacterKey then
+            local simulated = self.includeSimulated == true
+            local isFavorite = Addon.Connections:GetLevel(self.remoteCharacterKey, simulated) == "favorite"
+            Addon.Connections:SetFavorite(self.remoteCharacterKey, not isFavorite, simulated)
+            self:RefreshConnectionActions()
+        end
+    end)
+
+    local manage = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+    manage:SetSize(110, 22)
+    manage:SetPoint("LEFT", favorite, "RIGHT", 6, 0)
+    manage:SetText(Addon:GetText("CONNECTION_MANAGE"))
+    manage:SetScript("OnClick", function()
+        if self.remoteCharacterKey and not self.includeSimulated then
+            Addon.ConnectionsUI:Select(self.remoteCharacterKey)
+        end
+    end)
+
     for _, definition in ipairs(VIEW_FIELDS) do
         local label = content:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
         label:SetText(Addon:GetText(definition.label))
@@ -74,6 +112,9 @@ function Viewer:Create(parent)
     self.content = content
     self.title = title
     self.contextLabel = contextLabel
+    self.rememberButton = remember
+    self.favoriteButton = favorite
+    self.manageButton = manage
     self:Refresh()
     return panel
 end
@@ -100,7 +141,8 @@ function Viewer:Refresh()
         self.contextLabel:SetText(Addon:GetText("PROFILE_VIEWER_LOCAL"))
     end
 
-    local y = -48
+    self:RefreshConnectionActions()
+    local y = self.remoteCharacterKey and -72 or -48
     for _, row in ipairs(self.rows) do
         row.label:ClearAllPoints()
         row.label:SetPoint("TOPLEFT", self.content, "TOPLEFT", 4, y)
@@ -113,6 +155,26 @@ function Viewer:Refresh()
     end
 
     self.content:SetHeight(math.max(600, -y + 20))
+end
+
+function Viewer:RefreshConnectionActions()
+    if not self.rememberButton then
+        return
+    end
+    local visible = self.remoteCharacterKey ~= nil and Addon.Database:GetPrivacyMode() ~= "hidden"
+    self.rememberButton:SetShown(visible)
+    self.favoriteButton:SetShown(visible)
+    self.manageButton:SetShown(visible and not self.includeSimulated)
+    if not visible then
+        return
+    end
+    local simulated = self.includeSimulated == true
+    local connection = Addon.Connections:Get(self.remoteCharacterKey, simulated)
+    local favorite = connection and connection.favorite == true
+    self.rememberButton:SetText(Addon:GetText(connection and "CONNECTION_FORGET" or "CONNECTION_REMEMBER"))
+    self.favoriteButton:SetText(Addon:GetText(favorite and "CONNECTION_UNFAVORITE" or "CONNECTION_FAVORITE"))
+    self.favoriteButton:SetEnabled(connection ~= nil)
+    self.manageButton:SetEnabled(connection ~= nil)
 end
 
 function Viewer:ShowLocal()

@@ -11,24 +11,49 @@ local SIMULATED_CHARACTER_KEY = "ForeverRPTester-TestRealm"
 local MALFORMED_CHARACTER_KEY = "ForeverRPMalformed-TestRealm"
 local INCOMPATIBLE_CHARACTER_KEY = "ForeverRPIncompatible-TestRealm"
 
+local function EnumValue(enumName, field, fallback)
+    local values = Enum and Enum[enumName]
+    local value = values and values[field]
+    return type(value) == "number" and value or fallback
+end
+
+local function IsSuccess(result, enumName)
+    return result == true or (type(result) == "number"
+        and result == EnumValue(enumName, "Success", 0))
+end
+
 local function RegisterPrefix(prefix)
-    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
-        return C_ChatInfo.RegisterAddonMessagePrefix(prefix), "C_ChatInfo.RegisterAddonMessagePrefix"
+    local register = C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix or RegisterAddonMessagePrefix
+    local apiName = C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix
+        and "C_ChatInfo.RegisterAddonMessagePrefix" or (register and "RegisterAddonMessagePrefix")
+    local result
+    if register then
+        result = register(prefix)
     end
-    if RegisterAddonMessagePrefix then
-        return RegisterAddonMessagePrefix(prefix), "RegisterAddonMessagePrefix"
+
+    -- The query also recognizes prefixes registered before our initialization.
+    local isRegistered = C_ChatInfo and C_ChatInfo.IsAddonMessagePrefixRegistered
+        or IsAddonMessagePrefixRegistered
+    if isRegistered then
+        return isRegistered(prefix) == true, apiName or "IsAddonMessagePrefixRegistered"
     end
-    return false, nil
+    return IsSuccess(result, "RegisterAddonMessagePrefixResult"), apiName
 end
 
 local function SendAddonPacket(prefix, payload, channel, target)
-    if C_ChatInfo and C_ChatInfo.SendAddonMessage then
-        return C_ChatInfo.SendAddonMessage(prefix, payload, channel, target)
+    local send = C_ChatInfo and C_ChatInfo.SendAddonMessage or SendAddonMessage
+    if not send then
+        return false, "unavailable"
     end
-    if SendAddonMessage then
-        return SendAddonMessage(prefix, payload, channel, target)
+    local result = send(prefix, payload, channel, target)
+    if IsSuccess(result, "SendAddonMessageResult") then
+        return true, "accepted"
     end
-    return false
+    if type(result) == "number" and (result == EnumValue("SendAddonMessageResult", "AddonMessageThrottle", 3)
+        or result == EnumValue("SendAddonMessageResult", "ChannelThrottle", 8)) then
+        return false, "throttled", result
+    end
+    return false, "failed", result
 end
 
 Addon.Communication = {
@@ -188,12 +213,14 @@ function Addon.Communication:SendPayload(payload, channel, target, debugLabel)
         Addon:Debug(debugLabel or "Packet", "broadcast suppressed by privacy")
         return false
     end
-    local result = SendAddonPacket(Addon.Constants.COMMUNICATION_PREFIX, payload, channel, target)
-    if result ~= false then
-        Addon:Debug(debugLabel or "Packet", "sent via", channel)
-        return true
+    -- Acceptance by the client is not confirmation of delivery to another player.
+    local accepted, reason, result = SendAddonPacket(Addon.Constants.COMMUNICATION_PREFIX, payload, channel, target)
+    if accepted then
+        Addon:Debug(debugLabel or "Packet", "accepted for enqueueing via", channel)
+        return true, "accepted"
     end
-    return false
+    Addon:Debug(debugLabel or "Packet", "send", reason, "via", channel, "result", tostring(result))
+    return false, reason
 end
 
 function Addon.Communication:SendHello()
@@ -274,6 +301,29 @@ function Addon.Communication:GetSimulatedCharacterKey()
 end
 
 function Addon.Communication:Simulate(action)
+    local connectionMode = action:match("^connection%s+(%S+)$")
+    if connectionMode then
+        local characterKey = self:GetSimulatedCharacterKey()
+        if connectionMode == "normal" or connectionMode == "clear" then
+            Addon.Connections:Forget(characterKey, true)
+        elseif connectionMode == "remembered" then
+            Addon.Connections:Remember(characterKey, true)
+            Addon.Connections:SetFavorite(characterKey, false, true)
+        elseif connectionMode == "favorite" then
+            Addon.Connections:SetFavorite(characterKey, true, true)
+        else
+            Addon:Print(Addon:GetText("SIM_HELP"))
+            return
+        end
+        Addon.Notifications:ResetCooldown(characterKey)
+        if Addon.NearbyPlayers:IsNearby(characterKey, true) then
+            Addon.NearbyPlayers:Remove(characterKey, "simulation connection reset")
+            Addon.NearbyPlayers:Reevaluate(characterKey)
+        end
+        Addon:Print(string.format(Addon:GetText("SIM_CONNECTION_SET"), connectionMode))
+        return
+    end
+
     local privacyMode, relationship = action:match("^privacy%s+(%S+)%s*(%S*)$")
     if privacyMode then
         if privacyMode ~= "visible" and privacyMode ~= "restricted" and privacyMode ~= "hidden" then
@@ -368,6 +418,7 @@ function Addon.Communication:Simulate(action)
         Addon.Notifications:ClearSimulatedState(SIMULATED_CHARACTER_KEY)
         Addon.Notifications:SetSimulationEnabled(false)
         Addon.ProfileTransfer:ClearSimulated()
+        Addon.Connections:ClearSimulated()
         Addon.NearbyPlayers:ReevaluateAll()
         Addon:Print(string.format(Addon:GetText("SIM_CLEARED"), removed))
         return
@@ -424,6 +475,11 @@ function Addon.Communication:Simulate(action)
         Addon:Print(string.format(Addon:GetText("SIM_PRIVACY_STATUS"),
             Addon:GetText("PRIVACY_" .. string.upper(Addon.Database:GetPrivacyMode())),
             Addon.Privacy.simulatedRelationship))
+        local connectionLevel = Addon.Connections:GetLevel(SIMULATED_CHARACTER_KEY, true)
+        Addon:Print(string.format(Addon:GetText("SIM_CONNECTION_STATUS"), connectionLevel))
+        local connection = Addon.Connections:Get(SIMULATED_CHARACTER_KEY, true)
+        Addon:Print(string.format(Addon:GetText("SIM_CONNECTION_ENCOUNTER"),
+            connection and connection.lastEncountered or "-"))
         return
     end
 

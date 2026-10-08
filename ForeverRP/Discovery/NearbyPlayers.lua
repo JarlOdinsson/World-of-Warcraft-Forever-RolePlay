@@ -77,6 +77,9 @@ function Addon.NearbyPlayers:Reevaluate(characterKey)
     if not previous or previous.rangeState ~= selectedState or previous.unit ~= selectedUnit then
         Addon:Debug("Player entered discovery range:", characterKey, selectedState)
     end
+    if not previous and Addon.Connections then
+        Addon.Connections:RecordEncounter(characterKey, presence.simulated == true)
+    end
     if not previous and Addon.Notifications then
         Addon.Notifications:OnNearbyEntered(self.players[characterKey])
     end

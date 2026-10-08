@@ -4,7 +4,7 @@ ForeverRP is planned as a roleplaying profile and proximity-based RP discovery a
 
 ## Current status
 
-Version `0.1.1-beta` provides local RP profiles, a minimap-first interface, a live Nearby browser, configurable discovery feedback, bounded profile exchange, account-wide discovery privacy, and player-tooltip integration. Remote profiles remain runtime-only.
+Version `0.1.1-beta` provides local RP profiles, a minimap-first interface, a live Nearby browser, configurable discovery feedback, bounded profile exchange, account-wide discovery privacy, player-tooltip integration, private Connections, and an optional RP action bar. Remote profiles remain runtime-only.
 
 ## Supported client
 
@@ -40,6 +40,10 @@ The minimap button is the primary graphical entry point. No main window opens au
 
 The Nearby panel lists current qualifying ForeverRP users. Selecting a row opens an already cached profile or requests it through the existing protocol and opens the same read-only Profile Viewer when the transfer completes.
 
+Connections let players remember or favorite canonical `Name-Realm` identities, keep a private local note, and revisit cached profiles. Connection notes and state are never transmitted. Nearby alerts distinguish normal, remembered, and favorite encounters while retaining the existing cooldown.
+
+The optional RP action bar provides 1-12 configurable explicit-click actions. It includes Blizzard emote presets and bounded custom `/e` text, plus persistent position, scale, lock, slot count, and slot configuration. It never fires actions automatically.
+
 Confirmed ForeverRP players receive concise additions to player tooltips. Cached profiles can show RP name, title, status, and profile availability. Tooltip display never requests a profile.
 
 Presence means only that another character recently exchanged a valid ForeverRP protocol message through a shared party, raid, instance, or guild channel. It does not indicate physical proximity and expires after 15 minutes without another valid message.
@@ -65,6 +69,7 @@ With debug mode enabled, `/frp sim` provides local protocol diagnostics using th
 - `/frp sim privacy visible`
 - `/frp sim privacy restricted friend|guild|unknown`
 - `/frp sim privacy hidden`
+- `/frp sim connection normal|remembered|favorite|clear`
 
 Simulated players are runtime-only, visibly marked in debug presence output, and excluded from normal presence queries.
 
@@ -95,8 +100,8 @@ The initial goal is zero external libraries. Future dependencies must be license
 ## Known limitations
 
 - The CurseForge game-version identifier and project ID are unknown.
-- The project license has not been selected by the owner.
 - First-beta client validation and two-client network testing remain required.
+- Individual Blizzard emote tokens in the preset library require Forever-client validation.
 
 ## License
 

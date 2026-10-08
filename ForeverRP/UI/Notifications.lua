@@ -44,8 +44,14 @@ function Addon.Notifications:CanNotify(characterKey)
     return Now() - lastNotification >= cooldown
 end
 
-function Addon.Notifications:PlayDiscoverySound()
-    local soundKit = SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON
+function Addon.Notifications:PlayDiscoverySound(level)
+    local soundKit
+    if level == "favorite" then
+        soundKit = SOUNDKIT and (SOUNDKIT.READY_CHECK or SOUNDKIT.IG_QUEST_LOG_OPEN)
+    elseif level == "remembered" then
+        soundKit = SOUNDKIT and SOUNDKIT.IG_QUEST_LOG_OPEN
+    end
+    soundKit = soundKit or (SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
     if PlaySound and soundKit then
         pcall(PlaySound, soundKit, "SFX")
     end
@@ -66,14 +72,17 @@ function Addon.Notifications:OnNearbyEntered(player)
     end
 
     self.notifiedAt[player.characterKey] = Now()
+    local level = Addon.Connections and Addon.Connections:GetLevel(player.characterKey, player.simulated) or "normal"
     if settings.minimapPulse then
         Addon.MinimapButton:Pulse()
     end
     if settings.sound then
-        self:PlayDiscoverySound()
+        self:PlayDiscoverySound(level)
     end
     if settings.chat then
-        Addon:Print(string.format(Addon:GetText("KINDRED_NEARBY"), player.characterKey))
+        local key = level == "favorite" and "FAVORITE_NEARBY"
+            or (level == "remembered" and "FAMILIAR_NEARBY" or "KINDRED_NEARBY")
+        Addon:Print(string.format(Addon:GetText(key), player.characterKey))
     end
     Addon:Debug("Discovery notification fired:", player.characterKey)
 end

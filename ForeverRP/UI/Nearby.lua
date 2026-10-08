@@ -57,8 +57,23 @@ function Addon.NearbyUI:CreateRow(index)
     detail:SetPoint("TOPLEFT", identity, "BOTTOMLEFT", 0, -3)
     detail:SetJustifyH("LEFT")
     local availability = row:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-    availability:SetPoint("RIGHT", -8, 0)
+    availability:SetPoint("RIGHT", -94, 0)
     availability:SetJustifyH("RIGHT")
+
+    local connection = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    connection:SetSize(82, 22)
+    connection:SetPoint("RIGHT", -6, 0)
+    connection:SetScript("OnClick", function(button)
+        local level = Addon.Connections:GetLevel(row.characterKey, row.simulated)
+        if level == "normal" then
+            Addon.Connections:Remember(row.characterKey, row.simulated)
+        elseif level == "remembered" then
+            Addon.Connections:SetFavorite(row.characterKey, true, row.simulated)
+        else
+            Addon.Connections:SetFavorite(row.characterKey, false, row.simulated)
+        end
+        self:Refresh()
+    end)
 
     row:SetScript("OnClick", function(button)
         self:SelectPlayer(button.characterKey, button.simulated)
@@ -66,6 +81,7 @@ function Addon.NearbyUI:CreateRow(index)
     row.identity = identity
     row.detail = detail
     row.availability = availability
+    row.connection = connection
     self.rows[index] = row
     return row
 end
@@ -115,6 +131,14 @@ function Addon.NearbyUI:Refresh()
             row.identity:SetText(identity)
             row.detail:SetText(rpName and string.format(Addon:GetText("NEARBY_PROFILE_SUMMARY"), rpName, status)
                 or Addon:GetText("NEARBY_PROFILE_UNKNOWN"))
+            local level = Addon.Connections:GetLevel(player.characterKey, player.simulated)
+            local marker = level == "favorite" and Addon:GetText("CONNECTION_MARKER_FAVORITE")
+                or (level == "remembered" and Addon:GetText("CONNECTION_MARKER_REMEMBERED") or "")
+            if marker ~= "" then
+                row.identity:SetText(marker .. " " .. identity)
+            end
+            row.connection:SetText(Addon:GetText(level == "normal" and "CONNECTION_REMEMBER"
+                or (level == "remembered" and "CONNECTION_FAVORITE" or "CONNECTION_UNFAVORITE")))
             local available = Addon.RemoteProfiles:HasProfile(player.characterKey, includeSimulated)
             local pending = Addon.ProfileTransfer:IsRequestPending(player.characterKey, player.simulated)
             local key = available and "NEARBY_PROFILE_AVAILABLE"

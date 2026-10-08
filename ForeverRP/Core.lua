@@ -50,6 +50,7 @@ function Addon:OnPlayerLogin()
 
     self.Profile:Initialize()
     self.ProfileTransfer:Initialize()
+    self.EmoteBar:Initialize()
     self.PlayerTooltip:Initialize()
     self.UI:Initialize()
     self.Notifications:Initialize()

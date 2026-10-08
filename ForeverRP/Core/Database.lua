@@ -19,7 +19,18 @@ local ACCOUNT_DEFAULTS = {
                 cooldown = 600,
             },
         },
+        emoteBar = {
+            enabled = false,
+            slots = Addon.Constants.EMOTE_BAR_DEFAULT_SLOTS,
+            locked = false,
+            scale = 1,
+            point = "CENTER",
+            x = 0,
+            y = -220,
+            actions = {},
+        },
     },
+    connections = {},
 }
 
 local CHARACTER_DEFAULTS = {
@@ -111,6 +122,57 @@ function Addon.Database:Initialize()
         notifications.cooldown = 600
     else
         notifications.cooldown = math.floor(cooldown)
+    end
+
+    local emoteBar = ForeverRPDB.settings.emoteBar
+    if type(emoteBar.enabled) ~= "boolean" then
+        emoteBar.enabled = false
+    end
+    if type(emoteBar.locked) ~= "boolean" then
+        emoteBar.locked = false
+    end
+    emoteBar.slots = math.max(Addon.Constants.EMOTE_BAR_MIN_SLOTS,
+        math.min(Addon.Constants.EMOTE_BAR_MAX_SLOTS, math.floor(tonumber(emoteBar.slots) or 6)))
+    local validScale = false
+    for _, scale in ipairs(Addon.Constants.EMOTE_BAR_SCALES) do
+        if emoteBar.scale == scale then
+            validScale = true
+            break
+        end
+    end
+    if not validScale then
+        emoteBar.scale = 1
+    end
+    local validPoints = { CENTER = true, TOP = true, BOTTOM = true, LEFT = true, RIGHT = true,
+        TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true }
+    if not validPoints[emoteBar.point] or type(emoteBar.x) ~= "number" or type(emoteBar.y) ~= "number" then
+        emoteBar.point, emoteBar.x, emoteBar.y = "CENTER", 0, -220
+    else
+        emoteBar.x = math.max(-5000, math.min(5000, emoteBar.x))
+        emoteBar.y = math.max(-5000, math.min(5000, emoteBar.y))
+    end
+    if type(emoteBar.actions) ~= "table" then
+        emoteBar.actions = {}
+    end
+    if type(ForeverRPDB.connections) ~= "table" then
+        ForeverRPDB.connections = {}
+    end
+    for characterKey, connection in pairs(ForeverRPDB.connections) do
+        if type(characterKey) ~= "string" or type(connection) ~= "table"
+            or connection.characterKey ~= characterKey then
+            ForeverRPDB.connections[characterKey] = nil
+        else
+            connection.rpName = type(connection.rpName) == "string"
+                and connection.rpName:sub(1, Addon.Constants.PROFILE_LIMITS.rpName) or ""
+            connection.remembered = connection.remembered ~= false
+            connection.favorite = connection.favorite == true
+            connection.privateNote = type(connection.privateNote) == "string"
+                and connection.privateNote:gsub("[%z\1-\8\11\12\14-\31\127]", "")
+                    :sub(1, Addon.Constants.CONNECTION_NOTE_LIMIT) or ""
+            connection.addedAt = tonumber(connection.addedAt) or 0
+            connection.lastEncountered = tonumber(connection.lastEncountered)
+            connection.simulated = nil
+        end
     end
 
     -- Keep the Milestone 1 field synchronized while structured settings become canonical.
@@ -244,4 +306,12 @@ function Addon.Database:SetNotificationCooldown(seconds)
     end
     self.account.settings.discovery.notifications.cooldown = math.floor(seconds)
     return true
+end
+
+function Addon.Database:GetEmoteBarSettings()
+    return self.account.settings.emoteBar
+end
+
+function Addon.Database:GetConnections()
+    return self.account.connections
 end

@@ -16,6 +16,11 @@ Addon.Constants = {
     DEFAULT_DISCOVERY_RADIUS = 20,
     PRIVACY_MODES = { "visible", "restricted", "hidden" },
     DEFAULT_PRIVACY_MODE = "visible",
+    EMOTE_BAR_MIN_SLOTS = 1,
+    EMOTE_BAR_MAX_SLOTS = 12,
+    EMOTE_BAR_DEFAULT_SLOTS = 6,
+    EMOTE_BAR_SCALES = { 0.75, 1, 1.25, 1.5 },
+    CONNECTION_NOTE_LIMIT = 500,
     PROFILE_STATUSES = { "IC", "OOC", "AFK", "DND" },
     PROFILE_FIELD_ORDER = {
         "rpName",

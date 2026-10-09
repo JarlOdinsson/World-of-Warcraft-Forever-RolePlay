@@ -160,6 +160,7 @@ ForeverRP.Localization.enUS = {
     CONNECTION_MANAGE = "Connections",
     CONNECTION_PRIVATE_NOTE = "Private Note",
     CONNECTION_VIEW_PROFILE = "View Profile",
+    CONNECTION_PROFILE_UNAVAILABLE = "Unavailable",
     CONNECTION_LAST_SEEN = "Last encountered: %s",
     CONNECTION_NEVER = "Never",
     CONNECTION_JUST_NOW = "Just now",
@@ -168,4 +169,5 @@ ForeverRP.Localization.enUS = {
     CONNECTION_DAYS_AGO = "%d days ago",
     CONNECTION_MARKER_REMEMBERED = "[Known]",
     CONNECTION_MARKER_FAVORITE = "[Favorite]",
+    CONNECTION_SIMULATED_MARKER = "[SIM]",
 }

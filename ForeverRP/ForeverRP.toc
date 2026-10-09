@@ -9,6 +9,7 @@
 Localization\enUS.lua
 Core\Constants.lua
 Core.lua
+Core\ValueAccess.lua
 Core\Database.lua
 Profile\Profile.lua
 Profile\RemoteProfiles.lua

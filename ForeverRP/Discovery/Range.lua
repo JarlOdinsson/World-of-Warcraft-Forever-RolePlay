@@ -1,4 +1,5 @@
 local Addon = ForeverRP
+local ValueAccess = Addon.ValueAccess
 
 local STATE_LIMITS = {
     WITHIN_10 = 10,
@@ -23,18 +24,29 @@ Addon.Range = {
 }
 
 local function InteractionCheck(unit, index)
-    if not CheckInteractDistance then
+    if not ValueAccess:IsString(unit) or not CheckInteractDistance then
         return false
     end
     local result = CheckInteractDistance(unit, index)
-    return result == true or result == 1
+    return ValueAccess:CanAccess(result) and (result == true or result == 1)
 end
 
 function Addon.Range:GetRangeState(unit, characterKey)
-    if characterKey and self.simulated[characterKey] then
+    if not ValueAccess:CanAccess(characterKey) then
+        return "UNKNOWN"
+    end
+    if ValueAccess:IsString(characterKey) and self.simulated[characterKey] then
         return self.simulated[characterKey]
     end
-    if not UnitExists or not UnitExists(unit) or not UnitIsPlayer or not UnitIsPlayer(unit) then
+    if not ValueAccess:IsString(unit) or not UnitExists or not UnitIsPlayer then
+        return "UNKNOWN"
+    end
+    local exists = UnitExists(unit)
+    if not ValueAccess:CanAccess(exists) or (exists ~= true and exists ~= 1) then
+        return "UNKNOWN"
+    end
+    local isPlayer = UnitIsPlayer(unit)
+    if not ValueAccess:CanAccess(isPlayer) or (isPlayer ~= true and isPlayer ~= 1) then
         return "UNKNOWN"
     end
     if not CheckInteractDistance then

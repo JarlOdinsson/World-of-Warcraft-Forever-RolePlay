@@ -1,4 +1,5 @@
 local Addon = ForeverRP
+local ValueAccess = Addon.ValueAccess
 
 Addon.PlayerDetection = {
     units = {},
@@ -7,15 +8,34 @@ Addon.PlayerDetection = {
 }
 
 local function ResolveCharacterKey(unit)
-    if not UnitExists or not UnitExists(unit) or not UnitIsPlayer or not UnitIsPlayer(unit) then
+    if not ValueAccess:IsString(unit) or not UnitExists or not UnitIsPlayer then
+        return nil
+    end
+    local exists = UnitExists(unit)
+    if not ValueAccess:CanAccess(exists) or (exists ~= true and exists ~= 1) then
+        return nil
+    end
+    local isPlayer = UnitIsPlayer(unit)
+    if not ValueAccess:CanAccess(isPlayer) or (isPlayer ~= true and isPlayer ~= 1) then
         return nil
     end
     local name, realm
     if UnitFullName then
         name, realm = UnitFullName(unit)
     end
-    name = name or (UnitName and UnitName(unit))
-    if not name then
+    if not ValueAccess:CanAccess(name, realm) then
+        return nil
+    end
+    if not name and UnitName then
+        name, realm = UnitName(unit)
+        if not ValueAccess:CanAccess(name, realm) then
+            return nil
+        end
+    end
+    if not ValueAccess:IsString(name) then
+        return nil
+    end
+    if realm ~= nil and not ValueAccess:IsString(realm) then
         return nil
     end
     if realm and realm ~= "" then
@@ -25,6 +45,9 @@ local function ResolveCharacterKey(unit)
 end
 
 local function AddAssociation(characterKey, unit, source, simulated)
+    if not ValueAccess:IsString(characterKey) or not ValueAccess:IsString(unit) then
+        return false
+    end
     Addon.PlayerDetection.units[unit] = {
         characterKey = characterKey,
         unit = unit,
@@ -33,45 +56,63 @@ local function AddAssociation(characterKey, unit, source, simulated)
     }
     Addon.PlayerDetection.characters[characterKey] = Addon.PlayerDetection.characters[characterKey] or {}
     Addon.PlayerDetection.characters[characterKey][unit] = true
+    return true
 end
 
 function Addon.PlayerDetection:RemoveUnit(unit)
+    if not ValueAccess:IsString(unit) then
+        return false
+    end
     local detection = self.units[unit]
     if not detection then
-        return
+        return false
     end
     self.units[unit] = nil
-    local characterUnits = self.characters[detection.characterKey]
+    local characterKey = detection.characterKey
+    if not ValueAccess:IsString(characterKey) then
+        return false
+    end
+    local characterUnits = self.characters[characterKey]
     if characterUnits then
         characterUnits[unit] = nil
         if not next(characterUnits) then
-            self.characters[detection.characterKey] = nil
+            self.characters[characterKey] = nil
         end
     end
-    Addon:Debug("Player unit removed:", unit, detection.characterKey)
-    Addon.NearbyPlayers:Reevaluate(detection.characterKey)
+    Addon:Debug("Player unit removed:", unit, characterKey)
+    Addon.NearbyPlayers:Reevaluate(characterKey)
+    return true
 end
 
 function Addon.PlayerDetection:DetectUnit(unit, source)
+    if not ValueAccess:IsString(unit) then
+        return false
+    end
     local characterKey = ResolveCharacterKey(unit)
     if not characterKey or Addon.Presence:IsSelf(characterKey) then
         self:RemoveUnit(unit)
-        return
+        return false
     end
 
     local existing = self.units[unit]
     if existing and existing.characterKey ~= characterKey then
         self:RemoveUnit(unit)
     end
-    AddAssociation(characterKey, unit, source, false)
+    if not AddAssociation(characterKey, unit, source, false) then
+        return false
+    end
     if not existing or existing.characterKey ~= characterKey then
         Addon:Debug("Player unit detected:", unit, characterKey)
     end
     Addon.NearbyPlayers:Reevaluate(characterKey)
+    return true
 end
 
 function Addon.PlayerDetection:RefreshUnit(unit, source)
-    if UnitExists and UnitExists(unit) and UnitIsPlayer and UnitIsPlayer(unit) then
+    if not ValueAccess:IsString(unit) then
+        return false
+    end
+    if UnitExists and UnitIsPlayer then
         self:DetectUnit(unit, source)
     else
         self:RemoveUnit(unit)
@@ -86,11 +127,17 @@ function Addon.PlayerDetection:IsValid(detection)
         return Addon.Database:IsDebugEnabled()
             and Addon.Range:GetSimulatedState(detection.characterKey) ~= nil
     end
+    if not ValueAccess:IsString(detection.unit) or not ValueAccess:IsString(detection.characterKey) then
+        return false
+    end
     return ResolveCharacterKey(detection.unit) == detection.characterKey
 end
 
 function Addon.PlayerDetection:GetUnits(characterKey, includeSimulated)
     local results = {}
+    if not ValueAccess:IsString(characterKey) then
+        return results
+    end
     local characterUnits = self.characters[characterKey]
     if not characterUnits then
         return results
@@ -132,9 +179,15 @@ function Addon.PlayerDetection:ScanGroup()
 end
 
 function Addon.PlayerDetection:SetSimulatedCharacter(characterKey)
+    if not ValueAccess:IsString(characterKey) then
+        return false
+    end
     local unit = "simulated:" .. characterKey
-    AddAssociation(characterKey, unit, "simulation", true)
+    if not AddAssociation(characterKey, unit, "simulation", true) then
+        return false
+    end
     Addon.NearbyPlayers:Reevaluate(characterKey)
+    return true
 end
 
 function Addon.PlayerDetection:ClearSimulated()

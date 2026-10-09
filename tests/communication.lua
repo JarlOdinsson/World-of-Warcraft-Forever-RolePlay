@@ -68,6 +68,151 @@ Check(comm:Send("HELLO", "PARTY"), false)
 Check(comm:Send("ACK", "WHISPER", "Other-Realm"), false)
 Check(calls(), 0)
 
+local function LifecycleFixture()
+    local f = {now = 0, mode = "visible", sent = {}, sendResult = 0}
+    C_ChatInfo, Enum = nil, nil
+    RegisterAddonMessagePrefix, SendAddonMessage, IsAddonMessagePrefixRegistered = nil, nil, nil
+    LE_PARTY_CATEGORY_INSTANCE = 1
+    IsInGroup = function(category)
+        if category == LE_PARTY_CATEGORY_INSTANCE then
+            return f.instance == true
+        end
+        return f.party == true or f.raid == true or f.instance == true
+    end
+    IsInRaid = function() return f.raid == true end
+    IsInGuild = function() return f.guild == true end
+    GetTime = function() return f.now end
+    C_Timer = nil
+    ForeverRP = {
+        Constants = {
+            COMMUNICATION_PREFIX = "FOREVERRP",
+            PROTOCOL_VERSION = 1,
+            ADDON_VERSION = "0.1.1-beta",
+            MAX_MESSAGE_BYTES = 240,
+            PRESENCE_RENEWAL_SECONDS = 600,
+            PRESENCE_RETRY_SECONDS = 60,
+            PRESENCE_MAX_RETRIES = 3,
+        },
+        Database = {GetPrivacyMode = function() return f.mode end},
+        Privacy = {
+            CanBroadcast = function(_, channel)
+                if f.mode == "hidden" then return false end
+                return f.mode ~= "restricted" or channel == "GUILD"
+            end,
+            CanInteract = function() return true end,
+        },
+        Presence = {NormalizeCharacterKey = function(_, value) return value end},
+        Debug = function() end,
+    }
+    C_ChatInfo = {
+        RegisterAddonMessagePrefix = function() return 0 end,
+        SendAddonMessage = function(_, payload, channel)
+            f.sent[#f.sent + 1] = {payload = payload, channel = channel}
+            return f.sendResult
+        end,
+    }
+    dofile("ForeverRP/Discovery/Communication.lua")
+    f.comm = ForeverRP.Communication
+    Check(f.comm:Initialize(), true)
+    return f
+end
+
+Test = function(name, run)
+    run()
+    print("PASS " .. name)
+end
+
+Test("startup solo retries on a later group context", function()
+    local f = LifecycleFixture()
+    Check(f.comm:SendInitialHello(), false)
+    Check(f.comm.initialHelloSent, false)
+    Check(#f.sent, 0)
+    f.party = true
+    Check(f.comm:OnBroadcastContextChanged(), true)
+    Check(f.comm.initialHelloSent, true)
+    Check(#f.sent, 1)
+    Check(f.sent[1].channel, "PARTY")
+    Check(f.comm:OnBroadcastContextChanged(), false)
+    Check(#f.sent, 1)
+end)
+
+Test("group and guild changes announce only newly available channels", function()
+    local f = LifecycleFixture()
+    f.guild = true
+    Check(f.comm:SendInitialHello(), true)
+    Check(f.sent[1].channel, "GUILD")
+    f.party = true
+    Check(f.comm:OnBroadcastContextChanged(), true)
+    Check(#f.sent, 2)
+    Check(f.sent[2].channel, "PARTY")
+    f.party = false
+    Check(f.comm:OnBroadcastContextChanged(), false)
+    Check(#f.sent, 2)
+    f.instance = true
+    Check(f.comm:OnBroadcastContextChanged(), true)
+    Check(#f.sent, 3)
+    Check(f.sent[3].channel, "INSTANCE_CHAT")
+end)
+
+Test("renewal occurs before expiry and retries are bounded after throttling", function()
+    local f = LifecycleFixture()
+    f.party = true
+    Check(f.comm:SendInitialHello(), true)
+    f.now = 599
+    Check(f.comm:TickPresenceLifecycle(), false)
+    Check(#f.sent, 1)
+    f.now = 600
+    Check(f.comm:TickPresenceLifecycle(), true)
+    Check(#f.sent, 2)
+    f.sendResult = 3
+    f.now = 1200
+    Check(f.comm:TickPresenceLifecycle(), false)
+    Check(#f.sent, 3)
+    f.now = 1210
+    Check(f.comm:TickPresenceLifecycle(), false)
+    Check(#f.sent, 3)
+    f.now = 1260
+    Check(f.comm:TickPresenceLifecycle(), false)
+    f.now = 1320
+    Check(f.comm:TickPresenceLifecycle(), false)
+    Check(#f.sent, 5)
+    f.now = 1380
+    Check(f.comm:TickPresenceLifecycle(), false)
+    Check(#f.sent, 5)
+end)
+
+Test("privacy filters lifecycle broadcasts and restores eligible coverage", function()
+    local f = LifecycleFixture()
+    f.party, f.guild = true, true
+    f.mode = "hidden"
+    Check(f.comm:SendInitialHello(), false)
+    Check(#f.sent, 0)
+    f.mode = "restricted"
+    Check(f.comm:OnBroadcastContextChanged(), true)
+    Check(#f.sent, 1)
+    Check(f.sent[1].channel, "GUILD")
+    f.mode = "visible"
+    local sent = f.comm:SendHello()
+    Check(sent, true)
+    Check(#f.sent, 3)
+    Check(f.sent[2].channel, "PARTY")
+    Check(f.sent[3].channel, "GUILD")
+end)
+
+Test("initial throttling retries at most three times", function()
+    local f = LifecycleFixture()
+    f.party, f.sendResult = true, 3
+    Check(f.comm:SendInitialHello(), false)
+    Check(#f.sent, 1)
+    f.now = 60
+    Check(f.comm:TickPresenceLifecycle(), false)
+    f.now = 120
+    Check(f.comm:TickPresenceLifecycle(), false)
+    f.now = 180
+    Check(f.comm:TickPresenceLifecycle(), false)
+    Check(#f.sent, 3)
+end)
+
 -- Compile every imported runtime module without executing UI or game APIs.
 local modules = 0
 for line in io.lines("ForeverRP/ForeverRP.toc") do

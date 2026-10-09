@@ -48,6 +48,9 @@ Addon.Events:Register("PLAYER_LOGIN", function()
 end)
 
 Addon.Events:Register("PLAYER_LOGOUT", function()
+    if Addon.ConnectionsUI then
+        Addon.ConnectionsUI:CommitNote()
+    end
     if Addon.ProfileEditor then
         Addon.ProfileEditor:Commit()
     end
@@ -58,11 +61,15 @@ Addon.Events:Register("CHAT_MSG_ADDON", function(prefix, payload, channel, sende
 end)
 
 Addon.Events:RegisterOptional("NAME_PLATE_UNIT_ADDED", function(unit)
-    Addon.PlayerDetection:DetectUnit(unit, "nameplate")
+    if Addon.ValueAccess:IsString(unit) then
+        Addon.PlayerDetection:DetectUnit(unit, "nameplate")
+    end
 end)
 
 Addon.Events:RegisterOptional("NAME_PLATE_UNIT_REMOVED", function(unit)
-    Addon.PlayerDetection:RemoveUnit(unit)
+    if Addon.ValueAccess:IsString(unit) then
+        Addon.PlayerDetection:RemoveUnit(unit)
+    end
 end)
 
 Addon.Events:RegisterOptional("PLAYER_TARGET_CHANGED", function()
@@ -79,4 +86,17 @@ end)
 
 Addon.Events:RegisterOptional("GROUP_ROSTER_UPDATE", function()
     Addon.PlayerDetection:ScanGroup()
+    Addon.Communication:OnBroadcastContextChanged()
+end)
+
+Addon.Events:RegisterOptional("PLAYER_GUILD_UPDATE", function()
+    Addon.Communication:OnBroadcastContextChanged()
+end)
+
+Addon.Events:RegisterOptional("GUILD_ROSTER_UPDATE", function()
+    Addon.Communication:OnBroadcastContextChanged()
+end)
+
+Addon.Events:RegisterOptional("PLAYER_ENTERING_WORLD", function()
+    Addon.Communication:OnBroadcastContextChanged()
 end)

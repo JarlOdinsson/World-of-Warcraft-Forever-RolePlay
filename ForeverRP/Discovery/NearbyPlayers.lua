@@ -1,4 +1,5 @@
 local Addon = ForeverRP
+local ValueAccess = Addon.ValueAccess
 
 Addon.NearbyPlayers = {
     players = {},
@@ -10,6 +11,9 @@ local function Now()
 end
 
 function Addon.NearbyPlayers:Remove(characterKey, reason)
+    if not ValueAccess:IsString(characterKey) then
+        return
+    end
     local player = self.players[characterKey]
     if player then
         self.players[characterKey] = nil
@@ -24,7 +28,7 @@ function Addon.NearbyPlayers:Remove(characterKey, reason)
 end
 
 function Addon.NearbyPlayers:Reevaluate(characterKey)
-    if type(characterKey) ~= "string" then
+    if not ValueAccess:IsString(characterKey) then
         return
     end
     if not Addon.Database or not Addon.Database:GetAccount() then
@@ -47,7 +51,9 @@ function Addon.NearbyPlayers:Reevaluate(characterKey)
     local selectedState = "UNKNOWN"
     local radius = Addon.Database:GetDiscoveryRadius()
     for _, detection in ipairs(detections) do
-        if Addon.PlayerDetection:IsValid(detection) then
+        if detection and ValueAccess:IsString(detection.unit)
+            and ValueAccess:IsString(detection.characterKey)
+            and Addon.PlayerDetection:IsValid(detection) then
             local inRange, rangeState = Addon.Range:IsWithin(detection.unit, radius, characterKey)
             if inRange then
                 selectedUnit = detection.unit
@@ -118,6 +124,9 @@ function Addon.NearbyPlayers:IsNearby(characterKey, includeSimulated)
 end
 
 function Addon.NearbyPlayers:Get(characterKey, includeSimulated)
+    if not ValueAccess:IsString(characterKey) then
+        return nil
+    end
     local player = self.players[characterKey]
     if player and player.simulated and not includeSimulated then
         return nil

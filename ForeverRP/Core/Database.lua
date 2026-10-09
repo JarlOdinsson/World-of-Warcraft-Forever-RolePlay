@@ -205,6 +205,9 @@ function Addon.Database:SetDebugEnabled(enabled)
     if Addon.NearbyPlayers then
         Addon.NearbyPlayers:ReevaluateAll()
     end
+    if Addon.ConnectionsUI then
+        Addon.ConnectionsUI:Refresh()
+    end
 end
 
 function Addon.Database:IsMinimapVisible()

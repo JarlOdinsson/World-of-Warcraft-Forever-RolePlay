@@ -56,9 +56,27 @@ local function SendAddonPacket(prefix, payload, channel, target)
     return false, "failed", result
 end
 
+local function Now()
+    return GetTime and GetTime() or 0
+end
+
+local function ChannelSignature(channels)
+    return table.concat(channels, "|")
+end
+
+local function ChannelSet(channels)
+    local results = {}
+    for _, channel in ipairs(channels) do
+        results[channel] = true
+    end
+    return results
+end
+
 Addon.Communication = {
     initialized = false,
     initialHelloSent = false,
+    initialRetryAttempts = 0,
+    renewalRetryAttempts = 0,
 }
 
 function Addon.Communication:Initialize()
@@ -164,26 +182,30 @@ function Addon.Communication:Parse(payload)
     return packet
 end
 
-function Addon.Communication:SelectBroadcastChannel()
-    if Addon.Database:GetPrivacyMode() == "restricted" then
-        if IsInGuild and IsInGuild() then
-            return "GUILD"
-        end
-        return nil
-    end
+function Addon.Communication:GetBroadcastChannels()
+    local channels = {}
     if IsInGroup and LE_PARTY_CATEGORY_INSTANCE and IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then
-        return "INSTANCE_CHAT"
-    end
-    if IsInRaid and IsInRaid() then
-        return "RAID"
-    end
-    if IsInGroup and IsInGroup() then
-        return "PARTY"
+        channels[#channels + 1] = "INSTANCE_CHAT"
+    elseif IsInRaid and IsInRaid() then
+        channels[#channels + 1] = "RAID"
+    elseif IsInGroup and IsInGroup() then
+        channels[#channels + 1] = "PARTY"
     end
     if IsInGuild and IsInGuild() then
-        return "GUILD"
+        channels[#channels + 1] = "GUILD"
     end
-    return nil
+
+    local allowed = {}
+    for _, channel in ipairs(channels) do
+        if Addon.Privacy:CanBroadcast(channel) then
+            allowed[#allowed + 1] = channel
+        end
+    end
+    return allowed
+end
+
+function Addon.Communication:SelectBroadcastChannel()
+    return self:GetBroadcastChannels()[1]
 end
 
 function Addon.Communication:Send(messageType, channel, target)
@@ -223,20 +245,123 @@ function Addon.Communication:SendPayload(payload, channel, target, debugLabel)
     return false, reason
 end
 
-function Addon.Communication:SendHello()
-    local channel = self:SelectBroadcastChannel()
-    if not channel then
-        return false, nil
+function Addon.Communication:SendHello(channels)
+    channels = channels or self:GetBroadcastChannels()
+    if #channels == 0 then
+        return false, nil, 0
     end
-    return self:Send("HELLO", channel), channel
+
+    local sent, firstChannel, sentCount = false, nil, 0
+    for _, channel in ipairs(channels) do
+        local accepted = self:Send("HELLO", channel)
+        if accepted then
+            sent = true
+            firstChannel = firstChannel or channel
+            sentCount = sentCount + 1
+        end
+    end
+    if sent then
+        self.lastHelloAt = Now()
+        self.initialHelloSent = true
+        self.initialRetryAttempts = 0
+        self.renewalRetryAttempts = 0
+        local activeChannels = self:GetBroadcastChannels()
+        self.broadcastChannelSignature = ChannelSignature(activeChannels)
+        self.broadcastChannels = ChannelSet(activeChannels)
+    end
+    return sent, firstChannel or channels[1], sentCount
 end
 
-function Addon.Communication:SendInitialHello()
+function Addon.Communication:SendInitialHello(channels)
     if self.initialHelloSent then
+        return false
+    end
+    channels = channels or self:GetBroadcastChannels()
+    if #channels == 0 or self.initialRetryAttempts >= Addon.Constants.PRESENCE_MAX_RETRIES then
+        return false
+    end
+    self.initialRetryAttempts = self.initialRetryAttempts + 1
+    self.lastInitialAttemptAt = Now()
+    local sent, channel, sentCount = self:SendHello(channels)
+    if sent then
+        self.initialHelloSent = true
+        self.initialRetryAttempts = 0
+    end
+    return sent, channel, sentCount
+end
+
+function Addon.Communication:OnBroadcastContextChanged()
+    local channels = self:GetBroadcastChannels()
+    local signature = ChannelSignature(channels)
+    if signature == self.broadcastChannelSignature then
+        return false
+    end
+
+    local previous = self.broadcastChannels or {}
+    self.broadcastChannelSignature = signature
+    self.broadcastChannels = ChannelSet(channels)
+    self.initialRetryAttempts = 0
+    self.renewalRetryAttempts = 0
+
+    local added = {}
+    for _, channel in ipairs(channels) do
+        if not previous[channel] then
+            added[#added + 1] = channel
+        end
+    end
+    if #added == 0 then
+        return false
+    end
+    if self.initialHelloSent then
+        return self:SendHello(added)
+    end
+    return self:SendInitialHello(added)
+end
+
+function Addon.Communication:TickPresenceLifecycle()
+    if Addon.Database:GetPrivacyMode() == "hidden" then
+        return false
+    end
+
+    local now = Now()
+    local channels = self:GetBroadcastChannels()
+    if #channels == 0 then
+        return false
+    end
+
+    if not self.initialHelloSent then
+        if (not self.lastInitialAttemptAt or now - self.lastInitialAttemptAt >= Addon.Constants.PRESENCE_RETRY_SECONDS)
+            and self.initialRetryAttempts < Addon.Constants.PRESENCE_MAX_RETRIES then
+            return self:SendInitialHello(channels)
+        end
+        return false
+    end
+
+    if not self.lastHelloAt or now - self.lastHelloAt < Addon.Constants.PRESENCE_RENEWAL_SECONDS then
+        return false
+    end
+    if self.lastRenewalAttemptAt and now - self.lastRenewalAttemptAt < Addon.Constants.PRESENCE_RETRY_SECONDS then
+        return false
+    end
+    if self.renewalRetryAttempts >= Addon.Constants.PRESENCE_MAX_RETRIES then
+        return false
+    end
+
+    self.lastRenewalAttemptAt = now
+    local sent, channel, sentCount = self:SendHello(channels)
+    if not sent then
+        self.renewalRetryAttempts = self.renewalRetryAttempts + 1
+    end
+    return sent, channel, sentCount
+end
+
+function Addon.Communication:StartPresenceLifecycle()
+    if self.presenceTicker or not C_Timer or not C_Timer.NewTicker then
         return
     end
-    self.initialHelloSent = true
-    self:SendHello()
+    self.presenceTicker = C_Timer.NewTicker(Addon.Constants.PRESENCE_LIFECYCLE_TICK_SECONDS, function()
+        self:TickPresenceLifecycle()
+    end)
 end
 
 function Addon.Communication:OnAddonMessage(prefix, payload, channel, sender)

@@ -1,20 +1,39 @@
 local Addon = ForeverRP
+local ValueAccess = Addon.ValueAccess
 
 Addon.PlayerTooltip = {
     initialized = false,
 }
 
 local function GetCharacterKey(unit)
-    if type(unit) ~= "string" or not UnitExists or not UnitExists(unit)
-        or not UnitIsPlayer or not UnitIsPlayer(unit) then
+    if not ValueAccess:IsString(unit) or not UnitExists or not UnitIsPlayer then
+        return nil
+    end
+    local exists = UnitExists(unit)
+    if not ValueAccess:CanAccess(exists) or (exists ~= true and exists ~= 1) then
+        return nil
+    end
+    local isPlayer = UnitIsPlayer(unit)
+    if not ValueAccess:CanAccess(isPlayer) or (isPlayer ~= true and isPlayer ~= 1) then
         return nil
     end
     local name, realm
     if UnitFullName then
         name, realm = UnitFullName(unit)
     end
-    name = name or (UnitName and UnitName(unit))
-    if not name then
+    if not ValueAccess:CanAccess(name, realm) then
+        return nil
+    end
+    if not name and UnitName then
+        name, realm = UnitName(unit)
+        if not ValueAccess:CanAccess(name, realm) then
+            return nil
+        end
+    end
+    if not ValueAccess:IsString(name) then
+        return nil
+    end
+    if realm ~= nil and not ValueAccess:IsString(realm) then
         return nil
     end
     if realm and realm ~= "" then

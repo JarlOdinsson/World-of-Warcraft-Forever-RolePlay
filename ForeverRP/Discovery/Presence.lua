@@ -1,4 +1,5 @@
 local Addon = ForeverRP
+local ValueAccess = Addon.ValueAccess
 
 Addon.Presence = {
     players = {},
@@ -9,14 +10,14 @@ local function Now()
 end
 
 local function NormalizeRealm(realm)
-    if type(realm) ~= "string" then
+    if not ValueAccess:IsString(realm) then
         return ""
     end
     return realm:gsub("[%s%-]", "")
 end
 
 function Addon.Presence:NormalizeCharacterKey(sender)
-    if type(sender) ~= "string" or #sender == 0 or #sender > 100 then
+    if not ValueAccess:IsString(sender) or #sender == 0 or #sender > 100 then
         return nil
     end
     if sender:find("[%c|]") then
@@ -31,7 +32,8 @@ function Addon.Presence:NormalizeCharacterKey(sender)
     end
 
     realm = NormalizeRealm(realm)
-    if name == "" or realm == "" then
+    if not ValueAccess:IsString(name) or not ValueAccess:IsString(realm)
+        or name == "" or realm == "" then
         return nil
     end
     return name .. "-" .. realm
@@ -42,10 +44,20 @@ function Addon.Presence:GetLocalCharacterKey()
     if UnitFullName then
         name, realm = UnitFullName("player")
     end
-    name = name or (UnitName and UnitName("player"))
-    realm = realm or (GetNormalizedRealmName and GetNormalizedRealmName())
-        or (GetRealmName and GetRealmName())
-    if not name then
+    if not ValueAccess:CanAccess(name, realm) then
+        return nil
+    end
+    if not name and UnitName then
+        name, realm = UnitName("player")
+        if not ValueAccess:CanAccess(name, realm) then
+            return nil
+        end
+    end
+    if not realm then
+        realm = (GetNormalizedRealmName and GetNormalizedRealmName())
+            or (GetRealmName and GetRealmName())
+    end
+    if not ValueAccess:IsString(name) or not ValueAccess:IsString(realm) then
         return nil
     end
     return self:NormalizeCharacterKey(name .. "-" .. NormalizeRealm(realm))
@@ -53,7 +65,8 @@ end
 
 function Addon.Presence:IsSelf(characterKey)
     local localKey = self:GetLocalCharacterKey()
-    return localKey and characterKey and string.lower(localKey) == string.lower(characterKey)
+    return ValueAccess:IsString(localKey) and ValueAccess:IsString(characterKey)
+        and string.lower(localKey) == string.lower(characterKey)
 end
 
 function Addon.Presence:Expire()

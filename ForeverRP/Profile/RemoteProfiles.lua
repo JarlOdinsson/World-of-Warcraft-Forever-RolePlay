@@ -30,7 +30,7 @@ function Addon.RemoteProfiles:StoreProfile(characterKey, profile, metadata)
         simulated = metadata.simulated == true,
     }
     if Addon.Connections then
-        Addon.Connections:CacheRPName(characterKey, sanitized.rpName)
+        Addon.Connections:CacheRPName(characterKey, sanitized.rpName, metadata.simulated == true)
     end
     if Addon.NearbyUI then
         Addon.NearbyUI:Refresh()

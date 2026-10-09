@@ -58,5 +58,6 @@ function Addon:OnPlayerLogin()
     self.PlayerDetection:Initialize()
     self.State.ready = true
     self.Communication:SendInitialHello()
+    self.Communication:StartPresenceLifecycle()
     self:Print(self:GetText("ADDON_LOADED"))
 end

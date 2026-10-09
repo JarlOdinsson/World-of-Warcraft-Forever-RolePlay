@@ -25,13 +25,18 @@ function Addon.Connections:Get(characterKey, includeSimulated)
     return self:GetStore()[characterKey]
 end
 
-function Addon.Connections:GetAll()
+function Addon.Connections:GetAll(includeSimulated)
     if Addon.Database:GetPrivacyMode() == "hidden" then
         return {}
     end
     local results = {}
     for _, connection in pairs(self:GetStore()) do
         results[#results + 1] = connection
+    end
+    if includeSimulated then
+        for _, connection in pairs(self.simulated) do
+            results[#results + 1] = connection
+        end
     end
     table.sort(results, function(left, right)
         if left.favorite ~= right.favorite then
@@ -63,6 +68,10 @@ function Addon.Connections:Remember(characterKey, simulated)
     else
         connection.remembered = true
     end
+    if Addon.Presence:IsConfirmed(characterKey, simulated == true)
+        and Addon.NearbyPlayers:IsNearby(characterKey, simulated == true) then
+        connection.lastEncountered = Now()
+    end
     if not simulated and Addon.RemoteProfiles then
         local entry = Addon.RemoteProfiles:GetProfile(characterKey, false)
         if entry then
@@ -89,8 +98,8 @@ function Addon.Connections:SetFavorite(characterKey, favorite, simulated)
     return true
 end
 
-function Addon.Connections:SetNote(characterKey, note)
-    local connection = self:Get(characterKey, false)
+function Addon.Connections:SetNote(characterKey, note, simulated)
+    local connection = self:Get(characterKey, simulated == true)
     if not connection then
         return false
     end
@@ -99,8 +108,8 @@ function Addon.Connections:SetNote(characterKey, note)
     return true
 end
 
-function Addon.Connections:CacheRPName(characterKey, rpName)
-    local connection = self:Get(characterKey, false)
+function Addon.Connections:CacheRPName(characterKey, rpName, simulated)
+    local connection = self:Get(characterKey, simulated == true)
     if connection then
         connection.rpName = CleanText(rpName, Addon.Constants.PROFILE_LIMITS.rpName)
         self:RefreshUI()
@@ -110,7 +119,7 @@ end
 function Addon.Connections:RecordEncounter(characterKey, simulated)
     local connection = self:Get(characterKey, simulated)
     if connection then
-        connection.lastEncountered = simulated and (GetTime and GetTime() or 0) or Now()
+        connection.lastEncountered = Now()
         self:RefreshUI()
     end
 end

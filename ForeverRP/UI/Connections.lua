@@ -63,7 +63,7 @@ function Addon.ConnectionsUI:Create(parent)
     end
     favorite:SetScript("OnClick", function(button)
         if self.selectedKey then
-            Addon.Connections:SetFavorite(self.selectedKey, button:GetChecked(), false)
+            Addon.Connections:SetFavorite(self.selectedKey, button:GetChecked(), self.selectedSimulated == true)
         end
     end)
     self.favorite = favorite
@@ -77,10 +77,16 @@ function Addon.ConnectionsUI:Create(parent)
     note:SetSize(235, 24)
     note:SetAutoFocus(false)
     note:SetMaxLetters(Addon.Constants.CONNECTION_NOTE_LIMIT)
-    note:SetScript("OnEnterPressed", function(box)
-        if self.selectedKey then
-            Addon.Connections:SetNote(self.selectedKey, box:GetText())
+    note:SetScript("OnTextChanged", function(_, userInput)
+        if userInput then
+            self.noteDirty = true
         end
+    end)
+    note:SetScript("OnEditFocusLost", function()
+        self:CommitNote()
+    end)
+    note:SetScript("OnEnterPressed", function(box)
+        self:CommitNote()
         box:ClearFocus()
     end)
     self.note = note
@@ -90,19 +96,15 @@ function Addon.ConnectionsUI:Create(parent)
     save:SetPoint("TOPLEFT", note, "BOTTOMLEFT", -4, -10)
     save:SetText(Addon:GetText("SAVE"))
     save:SetScript("OnClick", function()
-        if self.selectedKey then
-            Addon.Connections:SetNote(self.selectedKey, note:GetText())
-        end
+        self:CommitNote()
     end)
 
     local view = CreateFrame("Button", nil, detail, "UIPanelButtonTemplate")
-    view:SetSize(92, 24)
+    view:SetSize(110, 24)
     view:SetPoint("LEFT", save, "RIGHT", 6, 0)
     view:SetText(Addon:GetText("CONNECTION_VIEW_PROFILE"))
     view:SetScript("OnClick", function()
-        if self.selectedKey then
-            Addon.ProfileViewer:ShowRemote(self.selectedKey, false)
-        end
+        self:OpenProfile()
     end)
     self.view = view
 
@@ -112,12 +114,25 @@ function Addon.ConnectionsUI:Create(parent)
     forget:SetText(Addon:GetText("CONNECTION_FORGET"))
     forget:SetScript("OnClick", function()
         if self.selectedKey then
-            Addon.Connections:Forget(self.selectedKey, false)
+            Addon.Connections:Forget(self.selectedKey, self.selectedSimulated == true)
             self.selectedKey = nil
+            self.selectedSimulated = false
             self:Refresh()
         end
     end)
 
+    panel:SetScript("OnHide", function()
+        self:CommitNote()
+    end)
+    local elapsedSinceRefresh = 0
+    panel:SetScript("OnUpdate", function(_, elapsed)
+        elapsedSinceRefresh = elapsedSinceRefresh + elapsed
+        if elapsedSinceRefresh >= 1 then
+            elapsedSinceRefresh = 0
+            self:RefreshProfileAction()
+            self:RefreshEncounterLabel()
+        end
+    end)
     self.panel = panel
     self:Refresh()
     return panel
@@ -134,8 +149,7 @@ function Addon.ConnectionsUI:CreateRow(index)
     text:SetJustifyH("LEFT")
     row.text = text
     row:SetScript("OnClick", function(button)
-        self.selectedKey = button.characterKey
-        self:Refresh()
+        self:Select(button.characterKey, button.simulated)
     end)
     self.rows[index] = row
     return row
@@ -146,7 +160,13 @@ function Addon.ConnectionsUI:Refresh()
         return
     end
     local hidden = Addon.Database:GetPrivacyMode() == "hidden"
-    local connections = Addon.Connections:GetAll()
+    local includeSimulated = Addon.Database:IsDebugEnabled()
+    local connections = Addon.Connections:GetAll(includeSimulated)
+    if self.selectedSimulated and not includeSimulated then
+        self:CommitNote()
+        self.selectedKey = nil
+        self.selectedSimulated = false
+    end
     self.empty:SetText(hidden and Addon:GetText("CONNECTIONS_HIDDEN") or Addon:GetText("CONNECTIONS_EMPTY"))
     self.empty:SetShown(#connections == 0)
 
@@ -161,26 +181,119 @@ function Addon.ConnectionsUI:Refresh()
             local marker = connection.favorite and Addon:GetText("CONNECTION_MARKER_FAVORITE")
                 or Addon:GetText("CONNECTION_MARKER_REMEMBERED")
             local name = connection.rpName ~= "" and connection.rpName or connection.characterKey
+            if connection.simulated then
+                name = name .. " " .. Addon:GetText("CONNECTION_SIMULATED_MARKER")
+            end
             row.text:SetText(marker .. " " .. name)
             row.characterKey = connection.characterKey
+            row.simulated = connection.simulated == true
         end
     end
 
-    local selected = self.selectedKey and Addon.Connections:Get(self.selectedKey, false)
+    local selected = self.selectedKey and Addon.Connections:Get(self.selectedKey, self.selectedSimulated == true)
     self.detail:SetShown(selected ~= nil and not hidden)
     if selected then
         local name = selected.rpName ~= "" and selected.rpName or selected.characterKey
         self.identity:SetText(name .. "\n" .. selected.characterKey)
-        self.encountered:SetText(string.format(Addon:GetText("CONNECTION_LAST_SEEN"),
-            RelativeTime(selected.lastEncountered)))
+        self:RefreshEncounterLabel()
         self.favorite:SetChecked(selected.favorite == true)
-        self.note:SetText(selected.privateNote or "")
-        self.view:SetEnabled(Addon.RemoteProfiles:HasProfile(selected.characterKey, false))
+        if self.noteKey ~= self.selectedKey or self.noteSimulated ~= self.selectedSimulated then
+            self:CommitNote()
+            self.noteKey = self.selectedKey
+            self.noteSimulated = self.selectedSimulated == true
+        end
+        if not self.noteDirty and self.note:GetText() ~= (selected.privateNote or "") then
+            self.note:SetText(selected.privateNote or "")
+        end
+    end
+    self:RefreshProfileAction()
+end
+
+function Addon.ConnectionsUI:RefreshEncounterLabel()
+    if not self.encountered or not self.selectedKey then
+        return
+    end
+    local connection = Addon.Connections:Get(self.selectedKey, self.selectedSimulated == true)
+    if connection then
+        self.encountered:SetText(string.format(Addon:GetText("CONNECTION_LAST_SEEN"),
+            RelativeTime(connection.lastEncountered)))
     end
 end
 
-function Addon.ConnectionsUI:Select(characterKey)
+function Addon.ConnectionsUI:CommitNote()
+    if not self.note or not self.noteKey or not self.noteDirty then
+        return
+    end
+    -- Clear before SetNote: saving refreshes this panel synchronously.
+    self.noteDirty = false
+    Addon.Connections:SetNote(self.noteKey, self.note:GetText(), self.noteSimulated == true)
+end
+
+function Addon.ConnectionsUI:GetProfileAction()
+    local characterKey = self.selectedKey
+    local simulated = self.selectedSimulated == true
+    if not characterKey or not Addon.Connections:Get(characterKey, simulated)
+        or Addon.Database:GetPrivacyMode() == "hidden" then
+        return "unavailable"
+    end
+    if simulated and not Addon.Database:IsDebugEnabled() then
+        return "unavailable"
+    end
+    if Addon.RemoteProfiles:HasProfile(characterKey, simulated) then
+        return "view", characterKey, simulated
+    end
+    if simulated then
+        if Addon.Database:IsDebugEnabled() and Addon.Presence:IsConfirmed(characterKey, true) then
+            return "request", characterKey, true
+        end
+        return "unavailable"
+    end
+    -- ResolveKnownKey alone does not expire stale presence entries.
+    Addon.Presence:Expire()
+    local target = Addon.Presence:ResolveKnownKey(characterKey, false)
+    if not target or not Addon.Presence:IsConfirmed(target, false)
+        or not Addon.Communication:CanBroadcast()
+        or not Addon.Privacy:CanInteract(target, "WHISPER", false) then
+        return "unavailable"
+    end
+    if Addon.ProfileTransfer:IsRequestPending(target, false) then
+        return "pending", target
+    end
+    return "request", target, false
+end
+
+function Addon.ConnectionsUI:RefreshProfileAction()
+    if not self.view then
+        return
+    end
+    local action = self:GetProfileAction()
+    local textKey = action == "view" and "CONNECTION_VIEW_PROFILE"
+        or (action == "request" and "NEARBY_PROFILE_REQUEST"
+        or (action == "pending" and "NEARBY_PROFILE_REQUESTING" or "CONNECTION_PROFILE_UNAVAILABLE"))
+    self.view:SetText(Addon:GetText(textKey))
+    self.view:SetEnabled(action == "view" or action == "request")
+end
+
+function Addon.ConnectionsUI:OpenProfile()
+    local action, characterKey, simulated = self:GetProfileAction()
+    if action == "view" then
+        Addon.ProfileViewer:ShowRemote(characterKey, simulated)
+    elseif action == "request" then
+        if simulated then
+            Addon.ProfileTransfer:SimulateProfile("valid")
+        else
+            local requested = Addon.ProfileTransfer:Request(characterKey)
+            Addon:Print(requested and string.format(Addon:GetText("PROFILE_REQUEST_SENT"), characterKey)
+                or Addon:GetText("PROFILE_REQUEST_SEND_FAILED"))
+        end
+    end
+    self:RefreshProfileAction()
+end
+
+function Addon.ConnectionsUI:Select(characterKey, simulated)
+    self:CommitNote()
     self.selectedKey = characterKey
+    self.selectedSimulated = simulated == true
     Addon.UI:Show("connections")
     self:Refresh()
 end

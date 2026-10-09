@@ -19,6 +19,7 @@ lua tests/communication.lua
 lua tests/connections.lua
 lua tests/restricted_values.lua
 lua tests/audit_fixes.lua
+lua tests/msp_compatibility.lua
 ```
 
 LuaJIT can replace `lua` in both commands. The Connections suite uses mock

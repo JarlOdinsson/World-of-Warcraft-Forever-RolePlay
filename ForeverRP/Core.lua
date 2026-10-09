@@ -55,6 +55,7 @@ function Addon:OnPlayerLogin()
 
     self.Profile:Initialize()
     self.ProfileTransfer:Initialize()
+    self.MSPCompatibility:Initialize()
     self.EmoteBar:Initialize()
     self.PlayerTooltip:Initialize()
     self.UI:Initialize()

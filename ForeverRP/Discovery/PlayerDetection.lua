@@ -104,6 +104,9 @@ function Addon.PlayerDetection:DetectUnit(unit, source)
     if not existing or existing.characterKey ~= characterKey then
         Addon:Debug("Player unit detected:", unit, characterKey)
     end
+    if Addon.MSPCompatibility then
+        Addon.MSPCompatibility:ObserveUnit(unit, characterKey, source)
+    end
     Addon.NearbyPlayers:Reevaluate(characterKey)
     return true
 end

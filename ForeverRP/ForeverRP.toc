@@ -11,6 +11,11 @@ Core\Constants.lua
 Core.lua
 Core\ValueAccess.lua
 Core\Database.lua
+Libs\MSP\LibStub\LibStub.lua
+Libs\MSP\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\MSP\ChatThrottleLib\ChatThrottleLib.xml
+Libs\MSP\Chomp\Chomp.xml
+Libs\MSP\LibMSP.lua
 Profile\Profile.lua
 Profile\RemoteProfiles.lua
 Modules\Connections.lua
@@ -22,6 +27,7 @@ Discovery\ProfileTransfer.lua
 Discovery\Range.lua
 Discovery\NearbyPlayers.lua
 Discovery\PlayerDetection.lua
+Discovery\MSPCompatibility.lua
 UI\Notifications.lua
 UI\PlayerTooltip.lua
 UI\Settings.lua

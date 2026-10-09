@@ -126,11 +126,15 @@ function Viewer:Refresh()
     local profile = Addon.Profile:Get()
     if self.remoteCharacterKey then
         local entry = Addon.RemoteProfiles:GetProfile(self.remoteCharacterKey, self.includeSimulated == true)
+        if not entry and Addon.MSPCompatibility then
+            entry = Addon.MSPCompatibility:GetProfile(self.remoteCharacterKey)
+        end
         if entry then
             profile = entry.profile
             self.title:SetText(profile.rpName ~= "" and Addon:EscapePlainText(profile.rpName)
                 or Addon:GetText("PROFILE_VIEWER_TITLE"))
-            self.contextLabel:SetText(string.format(Addon:GetText("PROFILE_VIEWER_REMOTE"), entry.characterKey))
+            local context = string.format(Addon:GetText("PROFILE_VIEWER_REMOTE"), entry.characterKey)
+            self.contextLabel:SetText(entry.source == "MSP" and (context .. " (MSP)") or context)
         else
             self.remoteCharacterKey = nil
             self.includeSimulated = false
@@ -161,7 +165,9 @@ function Viewer:RefreshConnectionActions()
     if not self.rememberButton then
         return
     end
-    local visible = self.remoteCharacterKey ~= nil and Addon.Database:GetPrivacyMode() ~= "hidden"
+    local external = self.remoteCharacterKey and Addon.MSPCompatibility
+        and Addon.MSPCompatibility:HasProfile(self.remoteCharacterKey)
+    local visible = self.remoteCharacterKey ~= nil and not external and Addon.Database:GetPrivacyMode() ~= "hidden"
     self.rememberButton:SetShown(visible)
     self.favoriteButton:SetShown(visible)
     self.manageButton:SetShown(visible and not self.includeSimulated)
@@ -189,6 +195,17 @@ function Viewer:ShowRemote(characterKey, includeSimulated)
     end
     self.remoteCharacterKey = characterKey
     self.includeSimulated = includeSimulated == true
+    Addon.UI:Show("viewer")
+    self:Refresh()
+    return true
+end
+
+function Viewer:ShowMSP(characterKey)
+    if not Addon.MSPCompatibility or not Addon.MSPCompatibility:HasProfile(characterKey) then
+        return false
+    end
+    self.remoteCharacterKey = characterKey
+    self.includeSimulated = false
     Addon.UI:Show("viewer")
     self:Refresh()
     return true

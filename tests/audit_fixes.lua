@@ -101,6 +101,7 @@ Test("failed profile chunks retry a bounded number of times and clear the respon
     f:RunTimers()
     Check(#f.sent, 3)
     Check(next(f.transfer.outgoingResponses), nil)
+    Check(f.transfer:SendProfile("Alice-Realm", "two"), false)
 end)
 
 Test("privacy changes cancel queued responses and duplicate requests are rejected", function()

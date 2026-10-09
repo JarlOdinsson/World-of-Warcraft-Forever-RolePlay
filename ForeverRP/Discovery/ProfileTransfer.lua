@@ -226,6 +226,7 @@ function Addon.ProfileTransfer:SendProfile(characterKey, messageId)
     }
     self.outgoingResponseOrder[#self.outgoingResponseOrder + 1] = responseKey
     self.outgoingResponsePeers[peer] = responseKey
+    self.responseCooldowns[peer] = Now()
     self:ScheduleResponsePump(0)
     return true
 end

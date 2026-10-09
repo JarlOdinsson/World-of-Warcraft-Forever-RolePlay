@@ -72,6 +72,19 @@ function Addon.Privacy:ResetRuntimeTrust()
     self.trustedPeers = {}
 end
 
+function Addon.Privacy:OnRelationshipsChanged()
+    self:ResetRuntimeTrust()
+    if Addon.Presence then
+        Addon.Presence:RevalidatePrivacy()
+    end
+    if Addon.ProfileTransfer then
+        Addon.ProfileTransfer:CancelDisallowedResponses()
+    end
+    if Addon.NearbyPlayers then
+        Addon.NearbyPlayers:ReevaluateAll()
+    end
+end
+
 function Addon.Privacy:CanInteract(characterKey, channel, simulated)
     local mode = Addon.Database:GetPrivacyMode()
     if mode == "hidden" then

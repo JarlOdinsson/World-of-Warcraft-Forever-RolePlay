@@ -18,6 +18,7 @@ Run the full suite from the repository root:
 lua tests/communication.lua
 lua tests/connections.lua
 lua tests/restricted_values.lua
+lua tests/audit_fixes.lua
 ```
 
 LuaJIT can replace `lua` in both commands. The Connections suite uses mock

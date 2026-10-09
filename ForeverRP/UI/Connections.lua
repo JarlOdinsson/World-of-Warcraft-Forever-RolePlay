@@ -180,7 +180,7 @@ function Addon.ConnectionsUI:Refresh()
         if connection then
             local marker = connection.favorite and Addon:GetText("CONNECTION_MARKER_FAVORITE")
                 or Addon:GetText("CONNECTION_MARKER_REMEMBERED")
-            local name = connection.rpName ~= "" and connection.rpName or connection.characterKey
+            local name = connection.rpName ~= "" and Addon:EscapePlainText(connection.rpName) or connection.characterKey
             if connection.simulated then
                 name = name .. " " .. Addon:GetText("CONNECTION_SIMULATED_MARKER")
             end
@@ -193,7 +193,7 @@ function Addon.ConnectionsUI:Refresh()
     local selected = self.selectedKey and Addon.Connections:Get(self.selectedKey, self.selectedSimulated == true)
     self.detail:SetShown(selected ~= nil and not hidden)
     if selected then
-        local name = selected.rpName ~= "" and selected.rpName or selected.characterKey
+        local name = selected.rpName ~= "" and Addon:EscapePlainText(selected.rpName) or selected.characterKey
         self.identity:SetText(name .. "\n" .. selected.characterKey)
         self:RefreshEncounterLabel()
         self.favorite:SetChecked(selected.favorite == true)

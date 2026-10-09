@@ -129,7 +129,7 @@ function Addon.NearbyUI:Refresh()
                 identity = identity .. " " .. Addon:GetText("NEARBY_SIMULATED_MARKER")
             end
             row.identity:SetText(identity)
-            row.detail:SetText(rpName and string.format(Addon:GetText("NEARBY_PROFILE_SUMMARY"), rpName, status)
+            row.detail:SetText(rpName and string.format(Addon:GetText("NEARBY_PROFILE_SUMMARY"), Addon:EscapePlainText(rpName), status)
                 or Addon:GetText("NEARBY_PROFILE_UNKNOWN"))
             local level = Addon.Connections:GetLevel(player.characterKey, player.simulated)
             local marker = level == "favorite" and Addon:GetText("CONNECTION_MARKER_FAVORITE")

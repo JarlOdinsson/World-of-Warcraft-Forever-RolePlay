@@ -25,8 +25,7 @@ local function PlainText(value)
     if value == "" then
         return Addon:GetText("PROFILE_VIEWER_EMPTY")
     end
-    local escaped = value:gsub("|", "||")
-    return escaped
+    return Addon:EscapePlainText(value)
 end
 
 function Viewer:Create(parent)
@@ -129,7 +128,8 @@ function Viewer:Refresh()
         local entry = Addon.RemoteProfiles:GetProfile(self.remoteCharacterKey, self.includeSimulated == true)
         if entry then
             profile = entry.profile
-            self.title:SetText(profile.rpName ~= "" and profile.rpName or Addon:GetText("PROFILE_VIEWER_TITLE"))
+            self.title:SetText(profile.rpName ~= "" and Addon:EscapePlainText(profile.rpName)
+                or Addon:GetText("PROFILE_VIEWER_TITLE"))
             self.contextLabel:SetText(string.format(Addon:GetText("PROFILE_VIEWER_REMOTE"), entry.characterKey))
         else
             self.remoteCharacterKey = nil

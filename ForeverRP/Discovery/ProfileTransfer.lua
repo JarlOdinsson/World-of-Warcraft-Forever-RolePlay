@@ -3,6 +3,10 @@ local Addon = ForeverRP
 Addon.ProfileTransfer = {
     incoming = {},
     pendingRequests = {},
+    outgoingResponses = {},
+    outgoingResponseOrder = {},
+    outgoingResponsePeers = {},
+    responseCooldowns = {},
     messageCounter = 0,
     initialized = false,
 }
@@ -40,6 +44,90 @@ function Addon.ProfileTransfer:Initialize()
             self:CleanupExpired()
         end)
     end
+end
+
+local function PeerKey(characterKey)
+    return string.lower(characterKey)
+end
+
+function Addon.ProfileTransfer:CanRespondTo(characterKey)
+    return Addon.Database:GetPrivacyMode() ~= "hidden"
+        and Addon.Privacy:CanInteract(characterKey, "WHISPER", false)
+end
+
+function Addon.ProfileTransfer:RemoveResponse(responseKey)
+    local response = self.outgoingResponses[responseKey]
+    if not response then
+        return false
+    end
+    self.outgoingResponses[responseKey] = nil
+    self.outgoingResponsePeers[PeerKey(response.characterKey)] = nil
+    for index, queuedKey in ipairs(self.outgoingResponseOrder) do
+        if queuedKey == responseKey then
+            table.remove(self.outgoingResponseOrder, index)
+            break
+        end
+    end
+    return true
+end
+
+function Addon.ProfileTransfer:ScheduleResponsePump(delay)
+    if self.responsePumpScheduled then
+        return
+    end
+    self.responsePumpScheduled = true
+    local function Pump()
+        self.responsePumpScheduled = false
+        self:ProcessResponseQueue()
+    end
+    if C_Timer and C_Timer.After then
+        C_Timer.After(delay or 0, Pump)
+    else
+        Pump()
+    end
+end
+
+function Addon.ProfileTransfer:ProcessResponseQueue()
+    local responseKey = self.outgoingResponseOrder[1]
+    local response = responseKey and self.outgoingResponses[responseKey]
+    if not response then
+        return false
+    end
+    if not self:CanRespondTo(response.characterKey) then
+        self:RemoveResponse(responseKey)
+        return self:ProcessResponseQueue()
+    end
+
+    local payload = Addon.Communication:Serialize(
+        "PROFILE_DATA", response.messageId, response.nextChunk, #response.chunks, response.chunks[response.nextChunk]
+    )
+    local accepted = payload and Addon.Communication:SendPayload(payload, "WHISPER", response.characterKey, "PROFILE_DATA")
+    if accepted then
+        response.nextChunk = response.nextChunk + 1
+        response.retries = 0
+        if response.nextChunk > #response.chunks then
+            self.responseCooldowns[PeerKey(response.characterKey)] = Now()
+            self:RemoveResponse(responseKey)
+            if #self.outgoingResponseOrder > 0 then
+                self:ScheduleResponsePump(Addon.Constants.PROFILE_RESPONSE_CHUNK_DELAY_SECONDS or 0.1)
+            end
+        else
+            self:ScheduleResponsePump(Addon.Constants.PROFILE_RESPONSE_CHUNK_DELAY_SECONDS or 0.1)
+        end
+        return true
+    end
+
+    response.retries = response.retries + 1
+    if response.retries > (Addon.Constants.PROFILE_RESPONSE_MAX_RETRIES or 2) then
+        Addon:Debug("Profile response cancelled after send failure:", response.characterKey)
+        self:RemoveResponse(responseKey)
+        if #self.outgoingResponseOrder > 0 then
+            self:ScheduleResponsePump(0)
+        end
+        return false
+    end
+    self:ScheduleResponsePump(Addon.Constants.PROFILE_RESPONSE_RETRY_SECONDS or 1)
+    return false
 end
 
 function Addon.ProfileTransfer:CreateMessageId()
@@ -108,31 +196,37 @@ function Addon.ProfileTransfer:BuildChunks(encoded)
 end
 
 function Addon.ProfileTransfer:SendProfile(characterKey, messageId)
+    if not self:CanRespondTo(characterKey) then
+        return false, "privacy"
+    end
+    local peer = PeerKey(characterKey)
+    local responseKey = TransferKey(characterKey, messageId)
+    if self.outgoingResponses[responseKey] or self.outgoingResponsePeers[peer] then
+        return false, "duplicate"
+    end
+    local cooldown = self.responseCooldowns[peer]
+    if cooldown and Now() - cooldown < (Addon.Constants.PROFILE_RESPONSE_PEER_COOLDOWN_SECONDS or 10) then
+        return false, "cooldown"
+    end
+    if #self.outgoingResponseOrder >= (Addon.Constants.PROFILE_RESPONSE_QUEUE_MAX or 8) then
+        return false, "busy"
+    end
     local encoded = self:SerializeProfile(Addon.Profile:Get())
     local chunks = encoded and self:BuildChunks(encoded)
     if not chunks then
-        return false
+        return false, "profile"
     end
 
-    local function SendChunk(index)
-        local payload = Addon.Communication:Serialize(
-            "PROFILE_DATA", messageId, index, #chunks, chunks[index]
-        )
-        if payload then
-            Addon.Communication:SendPayload(payload, "WHISPER", characterKey, "PROFILE_DATA")
-        end
-    end
-
-    for index = 1, #chunks do
-        local chunkIndex = index
-        if C_Timer and C_Timer.After then
-            C_Timer.After((index - 1) * 0.04, function()
-                SendChunk(chunkIndex)
-            end)
-        else
-            SendChunk(chunkIndex)
-        end
-    end
+    self.outgoingResponses[responseKey] = {
+        characterKey = characterKey,
+        messageId = messageId,
+        chunks = chunks,
+        nextChunk = 1,
+        retries = 0,
+    }
+    self.outgoingResponseOrder[#self.outgoingResponseOrder + 1] = responseKey
+    self.outgoingResponsePeers[peer] = responseKey
+    self:ScheduleResponsePump(0)
     return true
 end
 
@@ -140,6 +234,14 @@ function Addon.ProfileTransfer:Request(value)
     local characterKey = Addon.Presence:ResolveKnownKey(value, false)
     if not characterKey or Addon.Presence:IsSelf(characterKey) then
         return false, "unknown"
+    end
+    if self:IsRequestPending(characterKey, false) then
+        return false, "pending"
+    end
+    local pendingCount = 0
+    for _ in pairs(self.pendingRequests) do pendingCount = pendingCount + 1 end
+    if pendingCount >= (Addon.Constants.PROFILE_MAX_PENDING_REQUESTS or 20) then
+        return false, "busy"
     end
 
     local messageId = self:CreateMessageId()
@@ -190,9 +292,24 @@ end
 function Addon.ProfileTransfer:ResetForPrivacyChange()
     self.incoming = {}
     self.pendingRequests = {}
+    self.outgoingResponses = {}
+    self.outgoingResponseOrder = {}
+    self.outgoingResponsePeers = {}
     if Addon.NearbyUI then
         Addon.NearbyUI:Refresh()
     end
+end
+
+function Addon.ProfileTransfer:CancelDisallowedResponses()
+    local cancelled = 0
+    for responseKey, response in pairs(self.outgoingResponses) do
+        if not self:CanRespondTo(response.characterKey) then
+            if self:RemoveResponse(responseKey) then
+                cancelled = cancelled + 1
+            end
+        end
+    end
+    return cancelled
 end
 
 function Addon.ProfileTransfer:HandleChunk(packet, characterKey, simulated)

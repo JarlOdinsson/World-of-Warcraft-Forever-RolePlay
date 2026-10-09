@@ -90,11 +90,17 @@ Addon.Events:RegisterOptional("GROUP_ROSTER_UPDATE", function()
 end)
 
 Addon.Events:RegisterOptional("PLAYER_GUILD_UPDATE", function()
+    Addon.Privacy:OnRelationshipsChanged()
     Addon.Communication:OnBroadcastContextChanged()
 end)
 
 Addon.Events:RegisterOptional("GUILD_ROSTER_UPDATE", function()
+    Addon.Privacy:OnRelationshipsChanged()
     Addon.Communication:OnBroadcastContextChanged()
+end)
+
+Addon.Events:RegisterOptional("FRIENDLIST_UPDATE", function()
+    Addon.Privacy:OnRelationshipsChanged()
 end)
 
 Addon.Events:RegisterOptional("PLAYER_ENTERING_WORLD", function()

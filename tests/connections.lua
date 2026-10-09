@@ -49,6 +49,7 @@ local function Fixture()
     dofile("ForeverRP/Core/Constants.lua")
     dofile("ForeverRP/Core/ValueAccess.lua")
     ForeverRP.GetText = function(_, key) return ForeverRP.Localization.enUS[key] or key end
+    ForeverRP.EscapePlainText = function(_, value) return (type(value) == "string" and value or ""):gsub("|", "||") end
     ForeverRP.Debug = function() end
     ForeverRP.Print = function(_, text) f.message = text end
     ForeverRP.Database = {

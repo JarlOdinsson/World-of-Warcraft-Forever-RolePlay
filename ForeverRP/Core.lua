@@ -11,6 +11,11 @@ function Addon:GetText(key)
     return self.L[key] or key
 end
 
+function Addon:EscapePlainText(value)
+    value = type(value) == "string" and value or ""
+    return value:gsub("|", "||")
+end
+
 local function JoinMessage(...)
     local values = {}
     for index = 1, select("#", ...) do

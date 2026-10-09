@@ -12,6 +12,22 @@ local function CopyProfile(profile)
     return copy
 end
 
+function Addon.RemoteProfiles:EvictOldest()
+    local oldestKey, oldestAt
+    for characterKey, entry in pairs(self.profiles) do
+        local receivedAt = type(entry.receivedAt) == "number" and entry.receivedAt or -math.huge
+        if not oldestKey or receivedAt < oldestAt or (receivedAt == oldestAt and characterKey < oldestKey) then
+            oldestKey, oldestAt = characterKey, receivedAt
+        end
+    end
+    if oldestKey then
+        self.profiles[oldestKey] = nil
+        if Addon.ProfileViewer then
+            Addon.ProfileViewer:RefreshIfViewing(oldestKey)
+        end
+    end
+end
+
 function Addon.RemoteProfiles:StoreProfile(characterKey, profile, metadata)
     if type(characterKey) ~= "string" or Addon.Presence:IsSelf(characterKey) then
         return false, "invalid remote identity"
@@ -21,6 +37,13 @@ function Addon.RemoteProfiles:StoreProfile(characterKey, profile, metadata)
         return false, reason
     end
     metadata = type(metadata) == "table" and metadata or {}
+    if not self.profiles[characterKey] then
+        local count = 0
+        for _ in pairs(self.profiles) do count = count + 1 end
+        if count >= (Addon.Constants.REMOTE_PROFILE_CACHE_MAX or math.huge) then
+            self:EvictOldest()
+        end
+    end
     self.profiles[characterKey] = {
         characterKey = characterKey,
         profile = sanitized,

@@ -209,6 +209,7 @@ function Addon.Presence:Update(characterKey, metadata)
         activity = activity,
         transportRecipient = metadata.simulated ~= true and ValueAccess:IsString(metadata.transportRecipient)
             and metadata.transportRecipient or nil,
+        transportRecipientSource = ValueAccess:IsString(metadata.transportRecipientSource) and metadata.transportRecipientSource or nil,
     }
     Addon:Debug("Presence updated:", characterKey)
     if Addon.NearbyPlayers then
@@ -232,6 +233,7 @@ function Addon.Presence:UpdateActivity(characterKey, activity, version, recipien
         self.players[characterKey] = record
     end
     record.activity, record.lastSeen, record.transportRecipient = activity, Now(), recipient
+    record.transportRecipientSource = "CHAT_MSG_ADDON.sender:activity"
     activity.characterKey = characterKey
     if Addon.NearbyPlayers then Addon.NearbyPlayers:Reevaluate(characterKey, "presence-update") end
     return true
@@ -264,6 +266,12 @@ end
 function Addon.Presence:GetTransportRecipient(characterKey)
     local player = self:Get(characterKey, false)
     return player and player.transportRecipient or characterKey
+end
+
+function Addon.Presence:GetTransportRecipientSource(characterKey)
+    local player = self:Get(characterKey, false)
+    return player and player.transportRecipient
+        and ("presence:" .. (player.transportRecipientSource or "stored-recipient")) or "canonical-key-fallback"
 end
 
 function Addon.Presence:IsConfirmed(characterKey, includeSimulated)

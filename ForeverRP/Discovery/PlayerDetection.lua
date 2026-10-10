@@ -11,7 +11,7 @@ local function ResolveCharacterKey(unit)
     return Addon.Presence:ResolveUnitIdentity(unit)
 end
 
-local function AddAssociation(characterKey, unit, source, simulated, recipient)
+local function AddAssociation(characterKey, unit, source, simulated, recipient, identityEvidence)
     if not ValueAccess:IsString(characterKey) or not ValueAccess:IsString(unit) then
         return false
     end
@@ -21,6 +21,7 @@ local function AddAssociation(characterKey, unit, source, simulated, recipient)
         source = source,
         simulated = simulated == true,
         transportRecipient = recipient,
+        recipientSource = identityEvidence,
     }
     Addon.PlayerDetection.characters[characterKey] = Addon.PlayerDetection.characters[characterKey] or {}
     Addon.PlayerDetection.characters[characterKey][unit] = true
@@ -56,7 +57,7 @@ function Addon.PlayerDetection:DetectUnit(unit, source)
     if not ValueAccess:IsString(unit) then
         return false
     end
-    local characterKey, recipient = ResolveCharacterKey(unit)
+    local characterKey, recipient, identityEvidence = ResolveCharacterKey(unit)
     if not characterKey or Addon.Presence:IsSelf(characterKey) then
         self:RemoveUnit(unit)
         return false
@@ -66,7 +67,7 @@ function Addon.PlayerDetection:DetectUnit(unit, source)
     if existing and existing.characterKey ~= characterKey then
         self:RemoveUnit(unit)
     end
-    if not AddAssociation(characterKey, unit, source, false, recipient) then
+    if not AddAssociation(characterKey, unit, source, false, recipient, identityEvidence) then
         return false
     end
     if not existing or existing.characterKey ~= characterKey then

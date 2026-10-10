@@ -41,12 +41,20 @@ local function RegisterPrefix(prefix)
     return IsSuccess(result, "RegisterAddonMessagePrefixResult"), apiName
 end
 
-local function SendAddonPacket(prefix, payload, channel, target)
+local function SendAddonPacket(prefix, payload, channel, target, messageType, recipientSource)
     local send = C_ChatInfo and C_ChatInfo.SendAddonMessage or SendAddonMessage
     if not send then
         return false, "unavailable"
     end
     local result = send(prefix, payload, channel, target)
+    local success = IsSuccess(result, "SendAddonMessageResult")
+    local throttled = type(result) == "number" and (result == EnumValue("SendAddonMessageResult", "AddonMessageThrottle", 3)
+        or result == EnumValue("SendAddonMessageResult", "ChannelThrottle", 8))
+    if channel == "WHISPER" and Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordWhisper then
+        Addon.DiscoveryDiagnostics:RecordWhisper(C_ChatInfo and C_ChatInfo.SendAddonMessage and "C_ChatInfo.SendAddonMessage" or "SendAddonMessage",
+            messageType or "unknown", target, recipientSource or "caller-target", success,
+            success and "accepted" or throttled and "throttled" or "failed", result)
+    end
     if IsSuccess(result, "SendAddonMessageResult") then
         return true, "accepted", result
     end
@@ -230,7 +238,7 @@ function Addon.Communication:SelectBroadcastChannel()
     return self:GetBroadcastChannels()[1]
 end
 
-function Addon.Communication:Send(messageType, channel, target, lookupKey)
+function Addon.Communication:Send(messageType, channel, target, lookupKey, recipientSource)
     if not self:CanBroadcast() or type(channel) ~= "string" then
         RecordSend(messageType, channel, false, not self:CanBroadcast() and "prefix-unregistered" or "no-channel")
         return false
@@ -241,10 +249,10 @@ function Addon.Communication:Send(messageType, channel, target, lookupKey)
         return false
     end
 
-    return self:SendPayload(payload, channel, target, messageType, lookupKey)
+    return self:SendPayload(payload, channel, target, messageType, lookupKey, recipientSource)
 end
 
-function Addon.Communication:SendPayload(payload, channel, target, debugLabel, lookupKey)
+function Addon.Communication:SendPayload(payload, channel, target, debugLabel, lookupKey, recipientSource)
     if not self:CanBroadcast() or type(payload) ~= "string"
         or #payload == 0 or #payload > Addon.Constants.MAX_MESSAGE_BYTES then
         RecordSend(debugLabel, channel, false, not self:CanBroadcast() and "prefix-unregistered" or "invalid-payload")
@@ -265,7 +273,7 @@ function Addon.Communication:SendPayload(payload, channel, target, debugLabel, l
         return false
     end
     -- Acceptance by the client is not confirmation of delivery to another player.
-    local accepted, reason, result = SendAddonPacket(Addon.Constants.COMMUNICATION_PREFIX, payload, channel, target)
+    local accepted, reason, result = SendAddonPacket(Addon.Constants.COMMUNICATION_PREFIX, payload, channel, target, debugLabel, recipientSource)
     RecordSend(debugLabel, channel, accepted, reason, result)
     if accepted then
         Addon:Debug(debugLabel or "Packet", "accepted for enqueueing via", channel)
@@ -460,6 +468,7 @@ function Addon.Communication:HandleIncoming(prefix, payload, channel, sender, si
 
     packet.simulated = simulated == true
     packet.transportRecipient = not simulated and sender or nil
+    packet.transportRecipientSource = not simulated and ("CHAT_MSG_ADDON.sender:" .. packet.messageType) or nil
     local updated = Addon.Presence:Update(characterKey, packet)
     RecordIncoming(packet.messageType, sender, characterKey, channel,
         updated and "accepted" or "presence-update-rejected", simulated)
@@ -471,7 +480,7 @@ function Addon.Communication:HandleIncoming(prefix, payload, channel, sender, si
         elseif channel == "WHISPER" and Addon.ObservedDiscovery then
             Addon.ObservedDiscovery:Reply(sender, characterKey)
         else
-            self:Send("ACK", "WHISPER", sender)
+            self:Send("ACK", "WHISPER", sender, nil, "received-sender:HELLO")
         end
     elseif packet.messageType == "PROFILE_REQUEST" then
         Addon.ProfileTransfer:HandleRequest(packet, sender, characterKey, simulated == true)
@@ -500,7 +509,7 @@ function Addon.Communication:SendRevocation(peer, recipient)
     local target = recipient or Addon.ProfileAuthorization.served[string.lower(peer)].recipient
     if not Addon.ValueAccess:IsString(target) then return false end
     local payload = self:Serialize("PROFILE_STATUS", "REVOKE", "revoked")
-    local accepted, reason, result = SendAddonPacket(Addon.Constants.COMMUNICATION_PREFIX, payload, "WHISPER", target)
+    local accepted, reason, result = SendAddonPacket(Addon.Constants.COMMUNICATION_PREFIX, payload, "WHISPER", target, "PROFILE_STATUS", "served-recipient:revocation")
     RecordSend("PROFILE_STATUS", "WHISPER", accepted, reason, result)
     return accepted
 end

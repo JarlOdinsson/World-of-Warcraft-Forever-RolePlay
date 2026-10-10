@@ -60,7 +60,7 @@ local function Fixture()
     end
     ForeverRP.GetText = function() return "%s" end
     ForeverRP.Print = function(_, line)
-        if line:find("DIAG ", 1, true) then f.lines[#f.lines + 1] = line
+        if line:find("DIAG ", 1, true) or line:find("WHISPER ", 1, true) then f.lines[#f.lines + 1] = line
         else f.alerts = f.alerts + 1 end
     end
     ForeverRP.Database = {

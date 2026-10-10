@@ -23,6 +23,29 @@ local function Identity(value)
     return Access:IsString(value) and value:sub(1, 100) or Text(value)
 end
 
+-- Debug only; bounded output/history and no payloads, profiles or notes.
+function Diagnostics:RecordWhisper(api, kind, recipient, source, accepted, reason, result)
+    if not Addon.Database or not Addon.Database:IsDebugEnabled() then return end
+    if not Access:CanAccess(api, kind, recipient, source, accepted, reason, result) then return end
+    local now = Now()
+    if not self.whisperWindow or now - self.whisperWindow >= 60 then
+        self.whisperWindow, self.whisperCount, self.whisperSeen = now, 0, {}
+    end
+    if self.whisperCount >= 30 then return end
+    local signature = table.concat({Text(api), Text(kind), Text(recipient), Text(source), Text(reason), Text(result)}, "\031")
+    if self.whisperSeen[signature] and now - self.whisperSeen[signature] < 10 then return end
+    self.whisperSeen[signature] = now
+    self.whisperCount = self.whisperCount + 1
+    self.whispers = self.whispers or {}
+    self.whispers[#self.whispers + 1] = {at = now, api = Text(api), kind = Text(kind), recipient = Text(recipient),
+        source = Text(source), accepted = accepted, reason = Text(reason), result = Text(result)}
+    if #self.whispers > 20 then table.remove(self.whispers, 1) end
+    Addon:Print("WHISPER t=" .. string.format("%.1f", now) .. " api=" .. Text(api) .. " type=" .. Text(kind)
+        .. " recipient=[" .. Text(recipient) .. "] source=" .. Text(source)
+        .. " enqueue=" .. (accepted == nil and "unobserved" or accepted and "accepted" or "rejected")
+        .. " reason=" .. Text(reason) .. " result=" .. Text(result))
+end
+
 local function Age(record)
     return record and string.format("%.1fs", math.max(0, Now() - record.at)) or "-"
 end
@@ -153,6 +176,18 @@ function Diagnostics:Report(value)
     local channels = comm:GetBroadcastChannels()
     Print("version=" .. Text(Addon.Constants.ADDON_VERSION) .. " build=" .. Text(Addon.Constants.DIAGNOSTIC_BUILD)
         .. " protocol=" .. Text(Addon.Constants.PROTOCOL_VERSION))
+    local clientVersion, clientBuild, _, clientInterface
+    if GetBuildInfo then clientVersion, clientBuild, _, clientInterface = GetBuildInfo() end
+    Print("client=" .. Text(clientVersion) .. " clientBuild=" .. Text(clientBuild) .. " interface=" .. Text(clientInterface)
+        .. " FULL_PLAYER_NAME=[" .. Text(FULL_PLAYER_NAME) .. "] Chomp=" .. Text(AddOn_Chomp and AddOn_Chomp.Internal and AddOn_Chomp.Internal.VERSION)
+        .. " ForeverNameCompatibility=" .. Text(AddOn_Chomp and AddOn_Chomp.Internal and AddOn_Chomp.Internal.ForeverNameCompatibility))
+    if Addon.Database:IsDebugEnabled() then
+        for i = math.max(1, #(self.whispers or {}) - 4), #(self.whispers or {}) do
+            local entry = self.whispers[i]
+            Print("whisper type=" .. entry.kind .. " recipient=[" .. entry.recipient .. "] source=" .. entry.source
+                .. " api=" .. entry.api .. " enqueue=" .. Text(entry.accepted) .. " result=" .. entry.result .. " age=" .. Age(entry))
+        end
+    end
     Print("prefix=" .. Text(comm.prefixRegistered) .. " clientQuery=" .. queried
         .. " registrationAPI=" .. Text(comm.registrationAPI) .. " transport=" .. transport)
     Print("channels=" .. (#channels > 0 and table.concat(channels, ",") or "none")

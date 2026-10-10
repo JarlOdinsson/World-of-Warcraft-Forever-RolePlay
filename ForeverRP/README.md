@@ -4,7 +4,9 @@ ForeverRP provides roleplaying profiles, automatic discovery of consenting Forev
 
 ## Current version
 
-`0.1.1-beta.8` — build `directory-consent-20261010-8` (controlled multiplayer test build).
+`0.1.1-beta.9` — build `forever-names-transport-20261010-9` (controlled multiplayer test build).
+
+Beta.9 fixes the bundled Chomp login/Battle.net parser for Forever multiword names and its related MSP recipient corruption. It adds bounded debug-only tracing of actual whisper recipients. The yellow player-not-found error has a reproducible MSP corruption path, but actual delivery still needs retesting; no speculative discovery address rewrite is included. See [the Beta.9 retest guide](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/BETA9_TRANSPORT_RETEST.md), including shared-library load-order limitations and login/reload tests.
 
 This beta includes player detection, profile requests and viewing, private Connections, configurable discovery notifications, and the optional MingleBar RP action bar. Live testers have confirmed detection and profile retrieval. Broader testing across client settings, combat, crowded areas, and layers continues.
 

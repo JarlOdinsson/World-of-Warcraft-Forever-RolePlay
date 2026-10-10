@@ -198,11 +198,41 @@ function MSP:HasProfile(characterKey)
     return self:GetProfile(characterKey) ~= nil
 end
 
+function MSP:InitializeTransportDiagnostics()
+    if self.transportHooks or not hooksecurefunc then return end
+    self.transportHooks = true
+    local function Record(api, prefix, channel, target)
+        local access = Addon.ValueAccess
+        if not access or not access:CanAccess(prefix, channel, target)
+            or prefix ~= "MSP2" or channel ~= "WHISPER" then return end
+        if Addon.DiscoveryDiagnostics then
+            -- Secure post-hooks expose arguments, NOT the original API's result.
+            Addon.DiscoveryDiagnostics:RecordWhisper(api, "MSP2", target,
+                "shared-MSP2:Chomp/CTL-after-Ambiguate", nil, "result-not-exposed-by-hook")
+        end
+    end
+    for _, method in ipairs({"SendAddonMessage", "SendAddonMessageLogged"}) do
+        if C_ChatInfo and type(C_ChatInfo[method]) == "function" then
+            local api = "C_ChatInfo." .. method
+            hooksecurefunc(C_ChatInfo, method, function(prefix, _, channel, target) Record(api, prefix, channel, target) end)
+        end
+    end
+    if type(BNSendGameData) == "function" then
+        hooksecurefunc("BNSendGameData", function(accountID, prefix)
+            if Addon.ValueAccess:CanAccess(accountID, prefix) and prefix == "MSP2" and Addon.DiscoveryDiagnostics then
+                Addon.DiscoveryDiagnostics:RecordWhisper("BNSendGameData", "MSP2", accountID,
+                    "shared-MSP2:Battle.net-cache", nil, "result-not-exposed-by-hook")
+            end
+        end)
+    end
+end
+
 function MSP:Initialize()
     if self.initialized then
         return
     end
     self.initialized = true
+    self:InitializeTransportDiagnostics()
     local library = self:GetLibrary()
     if not library then
         return

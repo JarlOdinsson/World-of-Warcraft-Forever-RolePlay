@@ -26,6 +26,7 @@ lua tests/notifications.lua
 lua tests/public_commands.lua
 lua tests/enhanced_discovery.lua
 lua tests/directory.lua
+lua tests/forever_transport.lua
 ```
 
 LuaJIT can replace `lua` in these commands. The Connections suite uses mock
@@ -90,5 +91,14 @@ split-name API returns, checks the single shared lifecycle ticker, and verifies
 that bracket changes, metadata opt-out and directory-only peers do not create
 duplicate proximity alerts or bypass unit/range requirements.
 
-Current live test instructions: [DIRECTORY_GUILD_TESTING.md](../docs/DIRECTORY_GUILD_TESTING.md).
+The Forever transport suite executes the actual bundled Chomp, LibStub,
+CallbackHandler and LibMSP initialization, login/Battle.net callbacks, cache
+lookups and outbound sends. It covers multiword names, separate/qualified realms,
+shared-library negotiation and unchanged behavior on other clients. It also
+exercises real ForeverRP detection/HELLO/ACK/profile sends and bounded debug traces.
+MSP post-hooks assert actual API arguments, without inferring the API return value.
+Test-only client stubs do not establish real login, delivery or recipient syntax.
+
+Beta.9 issue-specific live tests: [BETA9_TRANSPORT_RETEST.md](../docs/BETA9_TRANSPORT_RETEST.md).
+Directory live test instructions: [DIRECTORY_GUILD_TESTING.md](../docs/DIRECTORY_GUILD_TESTING.md).
 The beta.7 checklist/report are historical and superseded by beta.8.

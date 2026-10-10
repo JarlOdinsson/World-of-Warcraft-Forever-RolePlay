@@ -2,6 +2,14 @@
 
 All notable user-facing changes to ForeverRP will be documented here.
 
+## 0.1.1-beta.9 — forever-names-transport-20261010-9 (controlled test build)
+
+- Fixed bundled Chomp login/Battle.net name merging on Forever Interface 16001: the client display format no longer makes spaces inside a character name look like realm separators. Separate realms and distinct ClassicBetaPvE/ClassicBetaPvE2 keys are preserved.
+- Added complete-unit-name evidence at bundled Chomp/LibMSP unit call sites. Kept the change client-scoped and used normal shared-library negotiation with a documented local compatibility revision; newer shared copies are not overwritten.
+- Reproduced and repaired MSP name corruption that turned `Cletus Jenkins-ClassicBetaPvE` into `Cletus JenkinsClassicBetaPvE`, also covering Ellina Stillwind and Gladiator Trapgodx. This explains a concrete matching code path; actual live delivery remains unverified.
+- Added bounded debug-only API-bound whisper recipient/source/result traces for ForeverRP discovery/profile sends and secure post-hook argument traces for shared MSP sends. Existing directed addressing, discovery limits and privacy checks remain intact; live player-not-found delivery failures are not claimed fixed.
+- Left player-not-found system errors visible on Forever instead of registering Chomp's existing filter. Added real-library login, Battle.net cache, coexistence and exact outbound-recipient regressions plus a controlled retest guide.
+
 ## 0.1.1-beta.8 — directory-consent-20261010-8 (controlled test build)
 
 - Reused the Activity panel for an explicitly opt-in RP Directory backed by the existing Presence cache. Added local character/zone/status filters, LF RP, separate temporary AFK/DND availability, optional subzones/continent information, and explicit existing profile requests. DND is excluded; OOC/AFK are hidden by default.

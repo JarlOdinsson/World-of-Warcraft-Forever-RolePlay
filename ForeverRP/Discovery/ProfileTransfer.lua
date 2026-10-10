@@ -54,6 +54,11 @@ local function TransportRecipient(characterKey)
     return Addon.Presence.GetTransportRecipient and Addon.Presence:GetTransportRecipient(characterKey) or characterKey
 end
 
+local function RecipientSource(characterKey)
+    return Addon.Presence.GetTransportRecipientSource and Addon.Presence:GetTransportRecipientSource(characterKey)
+        or "legacy-presence-recipient-or-key-fallback"
+end
+
 function Addon.ProfileTransfer:CanRespondTo(characterKey, messageId)
     return Addon.Database:GetPrivacyMode() ~= "hidden"
         and Addon.Privacy:CanInteract(characterKey, "WHISPER", false)
@@ -112,7 +117,8 @@ function Addon.ProfileTransfer:ProcessResponseQueue()
         "PROFILE_DATA", response.messageId, response.nextChunk, #response.chunks, response.chunks[response.nextChunk]
     )
     local accepted = payload and Addon.Communication:SendPayload(payload, "WHISPER",
-        response.transportRecipient, "PROFILE_DATA", response.characterKey)
+        response.transportRecipient, "PROFILE_DATA", response.characterKey,
+        response.recipientSource)
     if accepted then
         if Addon.ProfileAuthorization then Addon.ProfileAuthorization:MarkServed(response.characterKey, response.transportRecipient) end
         response.nextChunk = response.nextChunk + 1
@@ -242,6 +248,7 @@ function Addon.ProfileTransfer:SendProfile(characterKey, messageId, recipient)
     self.outgoingResponses[responseKey] = {
         characterKey = characterKey,
         transportRecipient = recipient or TransportRecipient(characterKey),
+        recipientSource = recipient and "received-request-sender" or RecipientSource(characterKey),
         messageId = messageId,
         chunks = chunks,
         nextChunk = 1,
@@ -272,7 +279,7 @@ function Addon.ProfileTransfer:Request(value)
     local messageId = self:CreateMessageId()
     local payload = Addon.Communication:Serialize("PROFILE_REQUEST", messageId)
     if not payload or not Addon.Communication:SendPayload(payload, "WHISPER",
-        TransportRecipient(characterKey), "PROFILE_REQUEST", characterKey) then
+        TransportRecipient(characterKey), "PROFILE_REQUEST", characterKey, RecipientSource(characterKey)) then
         return false, "send"
     end
     self.pendingRequests[TransferKey(characterKey, messageId)] = {

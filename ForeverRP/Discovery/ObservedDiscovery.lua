@@ -105,7 +105,8 @@ function Discovery:Attempt(peer)
     if not Addon.Communication:CanBroadcast() then peer.reason = "prefix-unregistered"; return end
     if not self:TakeBudget(true) then peer.reason = "traffic-limit"; return end
     peer.attempts = peer.attempts + 1
-    local accepted, reason = Addon.Communication:Send("HELLO", "WHISPER", peer.transportRecipient, peer.characterKey)
+    local accepted, reason = Addon.Communication:Send("HELLO", "WHISPER", peer.transportRecipient, peer.characterKey,
+        "observed-unit:" .. detection.unit .. ":" .. (detection.recipientSource or "lookup-key-fallback"))
     peer.reason = reason or (accepted and "accepted" or "failed")
     if reason == "throttled" then self.pausedUntil = now + 10 end
     peer.nextAt = now + 10 + (peer.sequence % 6)
@@ -138,7 +139,7 @@ function Discovery:Reply(sender, characterKey)
     if not previous and count >= MAX_PEERS then return false end
     if not self:TakeBudget(false) then return false end
     self.replies[key] = Now()
-    local accepted, reason = Addon.Communication:Send("ACK", "WHISPER", sender, characterKey)
+    local accepted, reason = Addon.Communication:Send("ACK", "WHISPER", sender, characterKey, "received-sender:HELLO")
     if reason == "throttled" then self.pausedUntil = Now() + 10 end
     return accepted, reason
 end

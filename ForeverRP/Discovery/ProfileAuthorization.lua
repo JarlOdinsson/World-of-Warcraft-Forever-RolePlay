@@ -29,7 +29,7 @@ function Auth:Status(peer, id, status)
     local payload = Addon.Communication:Serialize("PROFILE_STATUS", id, status)
     if status == "revoked" then return Addon.Communication:SendRevocation(peer) end
     return payload and Addon.Communication:SendPayload(payload, "WHISPER",
-        Addon.Presence:GetTransportRecipient(peer), "PROFILE_STATUS", peer)
+        Addon.Presence:GetTransportRecipient(peer), "PROFILE_STATUS", peer, Addon.Presence:GetTransportRecipientSource(peer))
 end
 
 function Auth:HandleRequest(packet, sender, peer)

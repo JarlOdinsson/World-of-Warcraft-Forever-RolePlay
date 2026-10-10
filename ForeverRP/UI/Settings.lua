@@ -19,15 +19,8 @@ function Addon.UI:CreateSettingsPanel(parent)
     title:SetPoint("TOPLEFT", 24, -24)
     title:SetText(Addon:GetText("SETTINGS_TITLE"))
 
-    local debugCheck = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    debugCheck:SetPoint("TOPLEFT", title, "BOTTOMLEFT", -4, -20)
-    SetCheckButtonText(debugCheck, Addon:GetText("SETTINGS_DEBUG"))
-    debugCheck:SetScript("OnClick", function(button)
-        Addon.Database:SetDebugEnabled(button:GetChecked())
-    end)
-
     local minimapCheck = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    minimapCheck:SetPoint("TOPLEFT", debugCheck, "BOTTOMLEFT", 0, -10)
+    minimapCheck:SetPoint("TOPLEFT", title, "BOTTOMLEFT", -4, -20)
     SetCheckButtonText(minimapCheck, Addon:GetText("SETTINGS_MINIMAP"))
     minimapCheck:SetScript("OnClick", function(button)
         local visible = button:GetChecked() == true
@@ -213,7 +206,6 @@ function Addon.UI:CreateSettingsPanel(parent)
         Addon.EmoteBar:ResetPosition()
     end)
 
-    panel.debugCheck = debugCheck
     panel.minimapCheck = minimapCheck
     panel.discoveryCheck = discoveryCheck
     panel.privacyDropdown = privacyDropdown
@@ -236,7 +228,6 @@ function Addon.UI:RefreshSettings()
         return
     end
 
-    self.settingsPanel.debugCheck:SetChecked(Addon.Database:IsDebugEnabled())
     self.settingsPanel.minimapCheck:SetChecked(Addon.Database:IsMinimapVisible())
     self.settingsPanel.discoveryCheck:SetChecked(Addon.Database:IsDiscoveryEnabled())
     local privacy = Addon.Database:GetPrivacyMode()

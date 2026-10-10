@@ -1,5 +1,10 @@
 # Discovery release blocker: two-player evidence
 
+Historical investigation notes: public build `0.1.1-beta.6` retires the debug,
+diagnostic, simulation, manual HELLO and presence slash commands below. These
+instructions describe earlier test builds; diagnostic internals remain covered
+by offline regression tests.
+
 Update: live evidence confirmed the split-name identity defect. Retest build
 `discovery-identity-20261009-4` (`0.1.1-beta.4`) repairs the resolver and preserves
 transport addresses separately. Use [IDENTITY_RESOLUTION_RETEST.md](IDENTITY_RESOLUTION_RETEST.md)

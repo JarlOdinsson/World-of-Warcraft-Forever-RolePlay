@@ -72,16 +72,12 @@ function Addon.Database:Initialize()
     if type(ForeverRPDB.settings) ~= "table" then
         ForeverRPDB.settings = {}
     end
-    if ForeverRPDB.settings.debug == nil and type(ForeverRPDB.debug) == "boolean" then
-        ForeverRPDB.settings.debug = ForeverRPDB.debug
-    end
+    -- Retire persisted development logging when loading a public build.
+    ForeverRPDB.settings.debug = false
 
     MergeDefaults(ForeverRPDB, ACCOUNT_DEFAULTS)
     MergeDefaults(ForeverRPCharacterDB, CHARACTER_DEFAULTS)
 
-    if type(ForeverRPDB.settings.debug) ~= "boolean" then
-        ForeverRPDB.settings.debug = false
-    end
     if type(ForeverRPDB.settings.minimap.visible) ~= "boolean" then
         ForeverRPDB.settings.minimap.visible = true
     end

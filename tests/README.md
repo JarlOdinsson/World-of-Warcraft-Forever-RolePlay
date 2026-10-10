@@ -23,9 +23,10 @@ lua tests/msp_compatibility.lua
 lua tests/discovery_diagnostics.lua
 lua tests/observed_discovery.lua
 lua tests/notifications.lua
+lua tests/public_commands.lua
 ```
 
-LuaJIT can replace `lua` in both commands. The Connections suite uses mock
+LuaJIT can replace `lua` in these commands. The Connections suite uses mock
 widgets plus the actual Connections, presence, privacy, transport, transfer,
 and remote-cache modules. It covers draft preservation, selection/focus/hide/
 logout saving, immediate encounter timestamps, request availability, pending
@@ -60,3 +61,10 @@ receive-before-observe, ClassicBetaPvE versus ClassicBetaPvE2, genuine cross-rea
 suffixes, raw transport addresses for discovery and profiles, shared tooltip/self
 identity, and conflicting/inaccessible complete-name outputs. Retest instructions:
 [IDENTITY_RESOLUTION_RETEST.md](../docs/IDENTITY_RESOLUTION_RETEST.md).
+
+The public-command suite verifies that retired debug, diagnostic, simulation,
+manual HELLO and presence commands cannot reach their old handlers. It also
+checks retained public commands, full names in profile requests, and migration
+of saved debug flags without losing profiles or Connections notes. Diagnostic
+and simulation internals remain available to offline suites; they are not
+public slash commands. Historical diagnostic documents describe older builds.

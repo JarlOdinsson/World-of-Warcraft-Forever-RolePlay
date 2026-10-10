@@ -1,5 +1,8 @@
 # Forever split-name identity repair
 
+Historical test instructions: public build `0.1.1-beta.6` retires the debug,
+diagnostic, simulation, manual HELLO and presence commands used below.
+
 Retest version: `0.1.1-beta.4`.
 Build: `discovery-identity-20261009-4`.
 Package: `dist/ForeverRP-v0.1.1-beta.4.zip`.

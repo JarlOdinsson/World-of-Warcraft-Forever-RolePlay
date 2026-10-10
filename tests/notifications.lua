@@ -87,6 +87,7 @@ UIDropDownMenu_SetText = function(widget, text) widget.label = text end
 ForeverRP.EmoteBar = {GetSettings = function() return db:GetEmoteBarSettings() end}
 dofile("ForeverRP/UI/Settings.lua")
 local panel = ForeverRP.UI:CreateSettingsPanel(CreateFrame())
+Check(panel.debugCheck, nil)
 ForeverRP.UI:RefreshSettings()
 Check(panel.soundChannelDropdown.selected, "SFX")
 Check(panel.testSound.label, "Test Sound")

@@ -87,7 +87,7 @@ f:Report("Peer-Realm")
 Check(Contains(f.lines, "no-eligible-channel"), true)
 Check(Contains(f.lines, "transport=C_ChatInfo.SendAddonMessage"), true)
 Check(Contains(f.lines, "no-confirmed-presence"), true)
-Check(Contains(f.lines, "build=discovery-sound-20261009-5"), true)
+Check(Contains(f.lines, "build=public-cleanup-20261010-6"), true)
 Check(f.diag:Report("Peer-Realm"), false)
 
 f.party = true
@@ -176,10 +176,10 @@ Check(Contains(f.lines, "prefix=false clientQuery=true"), true)
 Check(Contains(f.lines, "HELLO-send=prefix-unregistered"), true)
 local reportCount = #f.lines
 dofile("ForeverRP/Core/Commands.lua")
-ForeverRP.Commands:Handle("diag Peer-Realm")
-Check(#f.lines, reportCount) -- Slash command honors the shared cooldown.
+f.diag:Report("Peer-Realm")
+Check(#f.lines, reportCount) -- Internal diagnostic reports honor the shared cooldown.
 f.now = f.now + 5
-ForeverRP.Commands:Handle("diag Peer-Realm")
+f.diag:Report("Peer-Realm")
 Check(#f.lines > reportCount, true)
 
 -- Exercise the actual Nearby UI refresh with existing mock row widgets.
@@ -283,7 +283,7 @@ Check(Contains(f.lines, "no-unit-association"), true)
 Check(ForeverRP.NearbyPlayers:IsNearby(peer, false), false)
 f.now = f.now + 5
 dofile("ForeverRP/Core/Commands.lua")
-ForeverRP.Commands:Handle("diag " .. peer)
+f.diag:Report(peer)
 Check(Contains(f.lines, "peer-input=" .. peer .. " peer=" .. peer), true)
 for i = 1, 35 do f.diag:RecordEvaluation("Peer" .. i .. "-Realm", "no-unit-association", nil, "UNKNOWN", "presence-update", 0) end
 count = 0

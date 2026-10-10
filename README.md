@@ -1,112 +1,94 @@
 # ForeverRP
 
-ForeverRP is planned as a roleplaying profile and proximity-based RP discovery addon for World of Warcraft Forever.
+ForeverRP provides roleplaying profiles, automatic discovery of consenting ForeverRP users, and proximity notifications for World of Warcraft Forever.
 
-## Current status
+## Current version
 
-Version `0.1.1-beta` provides local RP profiles, a minimap-first interface, a live Nearby browser, configurable discovery feedback, bounded profile exchange, account-wide discovery privacy, player-tooltip integration, private Connections, and an optional RP action bar. Remote profiles remain runtime-only.
+`0.1.1-beta.6` — build `public-cleanup-20261010-6`.
 
-## Supported client
-
-ForeverRP targets World of Warcraft Forever only. Interface `16001` targets Forever beta client `1.60.1.70170`. The matching CurseForge game-version identifier still requires confirmation. No compatibility with Retail, Classic Era, Cataclysm, TBC, or other client flavors is claimed.
+This beta includes player detection, profile requests and viewing, private Connections, configurable discovery notifications, and the optional MingleBar RP action bar. Live testers have confirmed detection and profile retrieval. Broader testing across client settings, combat, crowded areas, and layers continues.
 
 ## Installation
 
-Release archives contain one top-level `ForeverRP/` folder. Extract it into the client's `Interface/AddOns` directory and verify that `Interface/AddOns/ForeverRP/ForeverRP.toc` exists.
+ForeverRP targets World of Warcraft Forever only (`## Interface: 16001`). Compatibility with Retail or other Classic clients is not claimed.
 
-Developers can run `tools/install-local.ps1` to sync a validated package to a configurable local AddOns directory.
+Extract the release's `ForeverRP` folder into your Forever installation's `Interface/AddOns` directory. The resulting path should be `Interface/AddOns/ForeverRP/ForeverRP.toc`, with no extra nested addon folder. Enable ForeverRP in the character-selection AddOns list. Restart the client for a first installation; use `/reload` after updating an existing installation.
 
-## Usage and slash commands
+## Getting started
 
-Available commands:
+1. Open ForeverRP with `/frp` or left-click its minimap button.
+2. Open **Profile** to write and save your character's RP information. **Profile Viewer** previews your own profile.
+3. Open **Settings** to choose your discovery radius, privacy mode, and notifications.
+4. Look in **Nearby** for confirmed ForeverRP users who qualify under the configured range. Select a player to view a cached profile or request their profile.
+5. Use **Remember** to save a player to **Connections**. Favorite remembered players and add private notes there. Saved Connections can request a fresh profile when existing communications confirm the player is reachable; otherwise the profile action shows unavailable.
 
-- `/frp` - open the main window to Home
-- `/frp help` - show concise help
-- `/frp settings` - open the main window to Settings
-- `/frp profile` - open the local character's Profile editor
-- `/frp view` - open the local Profile Viewer
-- `/frp hello` - send one development presence announcement
-- `/frp presence` - list confirmed ForeverRP users known this session
-- `/frp nearby` - list confirmed, detectable ForeverRP users qualifying under the selected radius
-- `/frp request <Name-Realm>` - request a profile from a confirmed ForeverRP user
-- `/frp version` - show addon, protocol, and database versions
-- `/frp debug` - show debug status
-- `/frp debug on` - enable persistent debug logging
-- `/frp debug off` - disable persistent debug logging
+Right-click the minimap button to open Settings. Drag the button around the minimap to reposition it.
 
-`/foreverrp` is an alias for `/frp`. The minimap button toggles the main window with a left-click, opens Settings with a right-click, and can be dragged around the minimap perimeter.
+## Discovery and notifications
 
-The minimap button is the primary graphical entry point. No main window opens automatically. The Profile section stores plain-text RP details separately for each character, while Profile Viewer provides a read-only local preview.
+ForeverRP observes player identities through target, mouseover, focus, nameplates, and group units. Independently observed target, mouseover, and nameplate players can receive a bounded directed discovery handshake. Group and guild announcements provide additional routes for establishing presence.
 
-The Nearby panel lists current qualifying ForeverRP users. Selecting a row opens an already cached profile or requests it through the existing protocol and opens the same read-only Profile Viewer when the transfer completes.
+A visible player is not automatically a ForeverRP user. A valid ForeverRP exchange must confirm presence before that player can appear in Nearby. Nearby also requires a matching, usable player unit and a passing range check. Missing or unknown range never qualifies as nearby.
 
-Connections let players remember or favorite canonical `Name-Realm` identities, keep a private local note, and revisit cached profiles. Connection notes and state are never transmitted. Nearby alerts distinguish normal, remembered, and favorite encounters while retaining the existing cooldown.
+Detection without a shared party or guild depends on the client exposing an observable unit and delivering the directed handshake. Friendly nameplate settings and visibility can affect automatic pass-by coverage. ForeverRP cannot enumerate every roleplayer on the server or guarantee detection of every passing player.
 
-The optional RP action bar provides 1-12 configurable explicit-click actions. It includes Blizzard emote presets and bounded custom `/e` text, plus persistent position, scale, lock, slot count, and slot configuration. It never fires actions automatically.
+Range choices use conservative interaction-distance brackets rather than exact yard measurements. The 20- and 25-yard settings use the available closer bracket conservatively.
 
-Confirmed ForeverRP players receive concise additions to player tooltips. Cached profiles can show RP name, title, status, and profile availability. Tooltip display never requests a profile.
+Notifications can pulse the minimap icon, play a ready-check alert, and print an optional chat message. **Test Sound** previews the alert using the selected **Master** (default) or **Sound Effects** channel. ForeverRP does not change global volume. Preview clicks are rate-limited and do not consume discovery cooldowns.
 
-Presence means only that another character recently exchanged a valid ForeverRP protocol message through a shared party, raid, instance, or guild channel. It does not indicate physical proximity and expires after 15 minutes without another valid message.
+Automatic notifications retain the per-player cooldown (10 minutes by default). Changes between eligible range brackets do not trigger another entry alert. Presence expires after 15 minutes without renewal; eligible communications renew it conservatively.
 
-Nearby additionally requires a detectable player unit and a conservative supported range check. The 10-yard option uses the duel interaction bracket, 15/20/25 use the approximately 11-yard trade bracket conservatively, and 30 uses the approximately 28-yard inspect/follow bracket. ForeverRP does not claim exact arbitrary yard measurements.
+Cross-layer discovery and reliable layer identification remain under investigation. Receiving an addon message does not establish physical proximity or a shared layer.
 
-### Developer and debug commands
+## Profiles, Connections, and privacy
 
-With debug mode enabled, `/frp sim` provides local protocol diagnostics using the same parser, dispatcher, and presence cache as real addon traffic:
+Your own profiles are saved separately per character. Connections and their private notes are saved account-wide. Notes are preserved through refreshes and selection changes, and are never sent to another player. Received remote profiles are cached for the current session and do not overwrite your own profile.
 
-- `/frp sim hello`
-- `/frp sim ack`
-- `/frp sim malformed`
-- `/frp sim incompatible`
-- `/frp sim clear`
-- `/frp sim status`
-- `/frp sim range 10|15|20|25|30|out|unknown`
-- `/frp sim notify on|off|reset|status`
-- `/frp sim profile`
-- `/frp sim profile malformed`
-- `/frp sim profile oversized`
-- `/frp sim profile clear`
-- `/frp sim privacy visible`
-- `/frp sim privacy restricted friend|guild|unknown`
-- `/frp sim privacy hidden`
-- `/frp sim connection normal|remembered|favorite|clear`
+Privacy modes:
 
-Simulated players are runtime-only, visibly marked in debug presence output, and excluded from normal presence queries.
+- **Visible:** permits normal discovery and profile exchange.
+- **Friends/Guild Only:** permits verified friends and guild members; unknown relationships are denied.
+- **Hidden:** suppresses presence advertisements and discovery/profile responses while keeping local profile tools available.
 
-Profile transfers use the existing confirmed-presence transport, a fixed field schema, bounded chunks, and strict profile limits. Received profiles are sanitized and cached for the current session only. They can be displayed read-only in Profile Viewer and never overwrite the local character profile.
+ForeverRP profiles are sent only in response to a request from a confirmed, privacy-qualified peer. Requests, responses, and retries are bounded. Profile text is validated and displayed as plain text.
 
-## Privacy modes
+Player tooltips can show concise information for confirmed ForeverRP users. Tooltip display itself does not request a profile.
 
-- Visible permits normal presence, discovery, and profile exchange.
-- Friends/Guild Only accepts verified friends and guild members. Unknown relationships are denied conservatively.
-- Hidden suppresses presence advertisement, discovery responses, and profile responses while leaving local profile tools available.
+## MingleBar
 
-## Privacy and discovery
+The optional RP action bar provides 1–12 configurable actions, including Blizzard emote presets and custom `/e` text. Position, scale, lock state, and slot configuration persist. Actions run only when clicked; the bar never performs them automatically.
 
-The local profile is transmitted only in response to an explicit request from a confirmed and privacy-qualified ForeverRP user. Presence, Nearby, relationship trust, notification, transfer, and remote-profile caches are runtime-only. Player-authored profile content remains data and is never executable code.
+## Commands
 
-Discovery feedback can pulse the minimap icon, play a subtle Blizzard sound, and optionally print a chat message. Per-character notification cooldown state is session-only; notification preferences persist account-wide.
+`/foreverrp` is an alias for `/frp`.
 
-## Development and releases
+| Command | Action |
+| --- | --- |
+| `/frp` | Open the main window |
+| `/frp help` | Show command help |
+| `/frp settings` | Open Settings |
+| `/frp profile` | Edit your own profile |
+| `/frp view` | Preview your own profile |
+| `/frp nearby` | List currently qualifying nearby users in chat |
+| `/frp request <Name-Realm>` | Request a confirmed user's profile; retain the full character name, including spaces |
+| `/frp version` | Show version, build, protocol, and database identifiers |
 
-`ForeverRP/ForeverRP.toc` is the authoritative addon-version source. The addon version, future protocol version, and future database schema version are separate concepts.
+Developer debug, diagnostic, manual HELLO/presence, and simulation slash commands are not available in this public build.
 
-Run `powershell -ExecutionPolicy Bypass -File tools/package.ps1` from the repository root to create a validated beta archive in `dist/`. Generated archives are not committed.
+## Experimental external-profile compatibility
 
-Development and public-test artifacts default to Beta. Alpha builds use an `-alpha` suffix; stable releases have no suffix and must not be used for untested builds.
+An isolated MSP reader and its required libraries are embedded, so a second RP addon is not required locally. The initial implementation requests external profiles for observed target/mouseover players, applies ForeverRP privacy and request limits, and labels imported profiles **MSP** in the existing viewer.
 
-The initial goal is zero external libraries. Future dependencies must be license-reviewed and documented as embedded, required, or optional before distribution.
+Live Total RP 3/MyRolePlay interoperability on Forever is not yet verified, and further MSP feature work is paused while discovery is stabilized. External profiles remain separate runtime data: they do not create ForeverRP presence, overwrite your own profile, or change Connections notes. Nearby integration and publishing ForeverRP profiles over MSP are not implemented.
 
-## Known limitations
+## Testing and development
 
-- The CurseForge game-version identifier and project ID are unknown.
-- First-beta client validation and two-client network testing remain required.
-- Individual Blizzard emote tokens in the preset library require Forever-client validation.
+See [tests/README.md](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/tests/README.md) in the source repository for offline regression suites. Offline mocks do not establish live delivery, visual layout, actual sound volume, or cross-layer compatibility.
 
-## License
+`ForeverRP/ForeverRP.toc` is the authoritative version source. From the repository root, `powershell -ExecutionPolicy Bypass -File tools/package.ps1` creates a validated beta ZIP in `dist/`. Generated packages are not committed. Before a local deployment, back up the existing addon outside the destination and verify installed files against source; leave `WTF` and SavedVariables untouched.
 
-ForeverRP is released under the MIT License. See `LICENSE`.
+## License and support
 
-## Issues and source
+ForeverRP is MIT-licensed. Embedded libraries retain their own licenses and notices under `ForeverRP/Libs/MSP` in the source repository (`Libs/MSP` inside the installed addon).
 
-Report issues and view source at https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay.
+Report bugs at [GitHub Issues](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/issues). Include your `/frp version` output, reproduction steps, privacy mode, and any Lua error. Do not include private notes or personal profile contents.

@@ -1,5 +1,8 @@
 # Unrelated-player discovery: requirement and transport investigation
 
+Historical investigation notes: public build `0.1.1-beta.6` retires the debug,
+diagnostic, simulation, manual HELLO and presence commands used below.
+
 Current retest: `0.1.1-beta.4`, build `discovery-identity-20261009-4`.
 The live `no-unit-association` defect is now explained by Forever's split-name
 returns. See [IDENTITY_RESOLUTION_RETEST.md](IDENTITY_RESOLUTION_RETEST.md) for

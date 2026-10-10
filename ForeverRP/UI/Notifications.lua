@@ -45,13 +45,30 @@ function Addon.Notifications:CanNotify(characterKey)
 end
 
 function Addon.Notifications:PlayDiscoverySound(level)
-    -- Use an audible alert for every connection level, including new players.
+    local settings = Addon.Database:GetNotificationSettings()
+    if settings.soundChoice == "none" then return true end
+    local now = Now()
+    if self.lastPlayback and now - self.lastPlayback < 2 then return true end
+    if self.soundHandle and C_Sound and C_Sound.IsPlaying then
+        local ok, playing = pcall(C_Sound.IsPlaying, self.soundHandle)
+        if ok and playing == true then return true end
+    end
     local soundKit = SOUNDKIT and (SOUNDKIT.READY_CHECK or SOUNDKIT.IG_QUEST_LOG_OPEN)
-    local channel = Addon.Database:GetNotificationSettings().soundChannel
+    local channel = settings.soundChannel
     if channel ~= "SFX" then channel = "Master" end
-    if PlaySound and soundKit then
-        local ok, played = pcall(PlaySound, soundKit, channel)
-        return ok and played ~= false
+    local play = PlaySound or (C_Sound and C_Sound.PlaySound)
+    local asset = soundKit
+    if settings.soundChoice == "bingbong" then
+        play, asset = PlaySoundFile, "Interface\\AddOns\\ForeverRP\\Media\\Sounds\\nyc-bing-bong.mp3"
+    end
+    if play and asset then
+        local ok, played, handle = pcall(play, asset, channel)
+        self.lastSoundResult = not ok and "api-error" or (played == true and "accepted" or "not-confirmed")
+        self.lastSoundChannel = channel
+        if ok and played == true then
+            self.lastPlayback, self.soundHandle = now, handle
+            return true
+        end
     end
     return false
 end

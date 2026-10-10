@@ -51,6 +51,7 @@ function Addon.RemoteProfiles:StoreProfile(characterKey, profile, metadata)
         addonVersion = type(metadata.addonVersion) == "string" and metadata.addonVersion or "unknown",
         protocolVersion = metadata.protocolVersion,
         simulated = metadata.simulated == true,
+        expiresAt = (GetTime and GetTime() or 0) + 300,
     }
     if Addon.Connections then
         Addon.Connections:CacheRPName(characterKey, sanitized.rpName, metadata.simulated == true)
@@ -58,6 +59,7 @@ function Addon.RemoteProfiles:StoreProfile(characterKey, profile, metadata)
     if Addon.NearbyUI then
         Addon.NearbyUI:Refresh()
     end
+    if Addon.ActivityUI then Addon.ActivityUI:Refresh() end
     return true
 end
 
@@ -67,6 +69,12 @@ end
 
 function Addon.RemoteProfiles:GetProfile(characterKey, includeSimulated)
     local entry = self.profiles[characterKey]
+    if entry and entry.expiresAt and entry.expiresAt <= (GetTime and GetTime() or 0) then
+        self:ClearProfile(characterKey)
+        return nil
+    end
+    if Addon.Privacy and Addon.Privacy.CanInteract
+        and not Addon.Privacy:CanInteract(characterKey, "WHISPER", includeSimulated == true) then return nil end
     if not entry or (entry.simulated and not includeSimulated) then
         return nil
     end
@@ -80,11 +88,27 @@ function Addon.RemoteProfiles:GetProfile(characterKey, includeSimulated)
     }
 end
 
+function Addon.RemoteProfiles:Expire()
+    local now = GetTime and GetTime() or 0
+    local changed = false
+    for key, entry in pairs(self.profiles) do
+        if entry.expiresAt and entry.expiresAt <= now then self.profiles[key] = nil; changed = true end
+    end
+    if changed then
+        if Addon.ProfileViewer then Addon.ProfileViewer:Refresh() end
+        if Addon.NearbyUI then Addon.NearbyUI:Refresh() end
+        if Addon.ConnectionsUI then Addon.ConnectionsUI:Refresh() end
+        if Addon.ActivityUI then Addon.ActivityUI:Refresh() end
+    end
+end
+
 function Addon.RemoteProfiles:ClearProfile(characterKey)
     self.profiles[characterKey] = nil
+    if Addon.ProfileViewer then Addon.ProfileViewer:RefreshIfViewing(characterKey) end
     if Addon.NearbyUI then
         Addon.NearbyUI:Refresh()
     end
+    if Addon.ActivityUI then Addon.ActivityUI:Refresh() end
 end
 
 function Addon.RemoteProfiles:ClearSimulated()

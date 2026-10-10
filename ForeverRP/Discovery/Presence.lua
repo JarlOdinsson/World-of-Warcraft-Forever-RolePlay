@@ -147,19 +147,29 @@ function Addon.Presence:Expire(force)
     self.lastExpirySweepAt = now
     local cutoff = now - Addon.Constants.PRESENCE_EXPIRY_SECONDS
     for characterKey, player in pairs(self.players) do
+        if player.activity and (now - player.activity.at > 150
+            or not Addon.Privacy:CanInteract(characterKey, "WHISPER", false)) then
+            self:ClearActivity(characterKey)
+        end
         if type(player.lastSeen) ~= "number" or player.lastSeen < cutoff then
             self.players[characterKey] = nil
+            if Addon.DiscoveryDiagnostics then
+                local counters = Addon.DiscoveryDiagnostics.counters
+                counters.expired = counters.expired + 1
+            end
         end
     end
     return true
 end
 
 function Addon.Presence:EvictOldest()
-    local oldestKey, oldestSeen
+    local oldestKey, oldestSeen, oldestPriority
     for characterKey, player in pairs(self.players) do
         local seen = type(player.lastSeen) == "number" and player.lastSeen or -math.huge
-        if not oldestKey or seen < oldestSeen or (seen == oldestSeen and characterKey < oldestKey) then
-            oldestKey, oldestSeen = characterKey, seen
+        local priority = player.metadataOnly and 0 or 1
+        if not oldestKey or priority < oldestPriority or priority == oldestPriority
+            and (seen < oldestSeen or seen == oldestSeen and characterKey < oldestKey) then
+            oldestKey, oldestSeen, oldestPriority = characterKey, seen, priority
         end
     end
     if oldestKey then
@@ -188,6 +198,7 @@ function Addon.Presence:Update(characterKey, metadata)
             self:EvictOldest()
         end
     end
+    local activity = self.players[characterKey] and self.players[characterKey].activity
     self.players[characterKey] = {
         characterKey = characterKey,
         addonVersion = metadata.addonVersion,
@@ -195,6 +206,7 @@ function Addon.Presence:Update(characterKey, metadata)
         lastSeen = Now(),
         confirmed = true,
         simulated = metadata.simulated == true,
+        activity = activity,
         transportRecipient = metadata.simulated ~= true and ValueAccess:IsString(metadata.transportRecipient)
             and metadata.transportRecipient or nil,
     }
@@ -203,6 +215,50 @@ function Addon.Presence:Update(characterKey, metadata)
         Addon.NearbyPlayers:Reevaluate(characterKey, "presence-update")
     end
     return true
+end
+
+-- Optional metadata lives on the existing presence record, never a second peer cache.
+-- Broad metadata may occupy free slots but cannot evict legacy discovery records.
+function Addon.Presence:UpdateActivity(characterKey, activity, version, recipient)
+    local existing = self:ResolveKnownKey(characterKey, false)
+    characterKey = existing or characterKey
+    local record = self.players[characterKey]
+    if not record then
+        local count = 0; for _ in pairs(self.players) do count = count + 1 end
+        if count >= (Addon.Constants.PRESENCE_CACHE_MAX or 250) then return false end
+        record = {characterKey = characterKey, addonVersion = version,
+            protocolVersion = Addon.Constants.PROTOCOL_VERSION, confirmed = true,
+            simulated = false, metadataOnly = true}
+        self.players[characterKey] = record
+    end
+    record.activity, record.lastSeen, record.transportRecipient = activity, Now(), recipient
+    activity.characterKey = characterKey
+    if Addon.NearbyPlayers then Addon.NearbyPlayers:Reevaluate(characterKey, "presence-update") end
+    return true
+end
+
+function Addon.Presence:ClearActivity(characterKey)
+    local record = self.players[characterKey]
+    if not record or not record.activity then return false end
+    record.activity = nil
+    if record.metadataOnly and not (Addon.NearbyPlayers and Addon.NearbyPlayers:IsNearby(characterKey, false)) then
+        self.players[characterKey] = nil
+        if Addon.NearbyPlayers then Addon.NearbyPlayers:Remove(characterKey, "activity withdrawn") end
+    end
+    if Addon.Activity then
+        Addon.Activity.counters.expired = Addon.Activity.counters.expired + 1
+        Addon.Activity.uiDirty = true
+    end
+    return true
+end
+
+function Addon.Presence:GetActivityRecords()
+    self:Expire()
+    local results = {}
+    for _, record in pairs(self.players) do
+        if record.activity and not record.simulated then results[#results + 1] = record.activity end
+    end
+    return results
 end
 
 function Addon.Presence:GetTransportRecipient(characterKey)

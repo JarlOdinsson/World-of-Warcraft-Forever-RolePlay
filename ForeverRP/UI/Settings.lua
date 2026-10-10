@@ -86,7 +86,7 @@ function Addon.UI:CreateSettingsPanel(parent)
     end)
 
     local notificationsTitle = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    notificationsTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 310, -70)
+    notificationsTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 310, -24)
     notificationsTitle:SetText(Addon:GetText("SETTINGS_NOTIFICATIONS"))
 
     local pulseCheck = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
@@ -135,6 +135,31 @@ function Addon.UI:CreateSettingsPanel(parent)
     testSound:SetPoint("LEFT", soundChannelDropdown, "RIGHT", 0, 2)
     testSound:SetText(Addon:GetText("SETTINGS_TEST_SOUND"))
     testSound:SetScript("OnClick", function() Addon.Notifications:TestSound() end)
+    local soundChoiceLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    soundChoiceLabel:SetPoint("TOPLEFT", soundChannelDropdown, "BOTTOMLEFT", 20, -8)
+    soundChoiceLabel:SetText("Notification sound")
+    local soundChoiceDropdown = CreateFrame("Frame", "ForeverRPNotificationSoundDropdown", panel, "UIDropDownMenuTemplate")
+    soundChoiceDropdown:SetPoint("TOPLEFT", soundChoiceLabel, "BOTTOMLEFT", -16, -3)
+    UIDropDownMenu_SetWidth(soundChoiceDropdown, 190)
+    local choices = {{"bingbong", "Bing Bong"}, {"drumroll", "Drumroll (legacy)"}, {"none", "None"}}
+    UIDropDownMenu_Initialize(soundChoiceDropdown, function(_, level)
+        for _, choice in ipairs(choices) do
+            local value, label = choice[1], choice[2]
+            local info = UIDropDownMenu_CreateInfo()
+            info.text, info.value = label, value
+            info.checked = Addon.Database:GetNotificationSettings().soundChoice == value
+            info.func = function()
+                Addon.Database:SetNotificationSoundChoice(value)
+                Addon.UI:RefreshSettings()
+            end
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end)
+    local privacyOptions = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    privacyOptions:SetSize(220, 24)
+    privacyOptions:SetPoint("BOTTOMLEFT", 24, 20)
+    privacyOptions:SetText("Discovery & Profile Privacy")
+    privacyOptions:SetScript("OnClick", function() Addon.UI:ShowPanel("privacy") end)
 
     local emoteTitle = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     emoteTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 310, -318)
@@ -215,6 +240,7 @@ function Addon.UI:CreateSettingsPanel(parent)
     panel.chatCheck = chatCheck
     panel.soundChannelDropdown = soundChannelDropdown
     panel.testSound = testSound
+    panel.soundChoiceDropdown = soundChoiceDropdown
     panel.emoteEnabled = emoteEnabled
     panel.emoteLocked = emoteLocked
     panel.emoteSlotDropdown = slotDropdown
@@ -243,6 +269,9 @@ function Addon.UI:RefreshSettings()
     UIDropDownMenu_SetSelectedValue(self.settingsPanel.soundChannelDropdown, notifications.soundChannel)
     UIDropDownMenu_SetText(self.settingsPanel.soundChannelDropdown,
         Addon:GetText("SETTINGS_SOUND_" .. string.upper(notifications.soundChannel)))
+    local soundLabels = {bingbong = "Bing Bong", drumroll = "Drumroll (legacy)", none = "None"}
+    UIDropDownMenu_SetSelectedValue(self.settingsPanel.soundChoiceDropdown, notifications.soundChoice)
+    UIDropDownMenu_SetText(self.settingsPanel.soundChoiceDropdown, soundLabels[notifications.soundChoice] or "Drumroll (legacy)")
     local emoteBar = Addon.EmoteBar:GetSettings()
     self.settingsPanel.emoteEnabled:SetChecked(emoteBar.enabled)
     self.settingsPanel.emoteLocked:SetChecked(emoteBar.locked)

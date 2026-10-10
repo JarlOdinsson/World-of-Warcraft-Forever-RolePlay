@@ -2,6 +2,24 @@
 
 All notable user-facing changes to ForeverRP will be documented here.
 
+## 0.1.1-beta.8 — directory-consent-20261010-8 (controlled test build)
+
+- Reused the Activity panel for an explicitly opt-in RP Directory backed by the existing Presence cache. Added local character/zone/status filters, LF RP, separate temporary AFK/DND availability, optional subzones/continent information, and explicit existing profile requests. DND is excluded; OOC/AFK are hidden by default.
+- Kept experimental networking disabled by default, all layers Unknown, and the existing Nearby unit/range pipeline intact. Added no library dependencies or message relays.
+- Repaired audit failures: historical guild metadata restoring privacy trust, activity-cache eviction of legacy peers, approval transfers expiring behind large queues, unbounded/obsolete revocations, lost raw transport addresses, short stationary-marker lifetimes, and one-shot metadata prefix registration.
+- Shared the existing Nearby lifecycle timer, bounded large-profile admission and cache-revocation history, and corrected rotating minimap projection. Retained the minimap launcher and user Settings spacing.
+- Retained the exact supplied audio bytes at `Media/Sounds/nyc-bing-bong.mp3`, with explicit Master/SFX playback, preview and migration coverage. Actual audio behavior still requires client validation.
+- Added directory, delayed-transfer, crowded-cache and combined discovery regressions, plus an updated architecture report and guild checklist. Offline validation does not prove live cross-layer discovery or release readiness.
+
+## 0.1.1-beta.7 — discovery-consent-20261010-7 (superseded test build)
+
+- Added separate Public, Approval Required and explicitly granted Connections Only profile disclosure. Enforced access before serialization and each chunk; bounded approvals, denials, revocation retries and five-minute remote cache leases.
+- Added opt-in location privacy and an isolated experimental activity network, disabled by default. Cross-layer/shared-channel delivery is unverified; layer status remains Unknown.
+- Added a zone-organized Activity panel and pooled, neutral, noninteractive minimap markers for recent valid volunteered coordinates. Existing Nearby qualification remains unchanged.
+- Bundled the owner-supplied spoken Bing Bong recording with redistribution permission. Added Bing Bong/legacy Drumroll/None selection, preserved upgrade settings, tightened playback success handling and retained Master/SFX preview without changing global audio settings.
+- Restored developer commands as requested and added aggregate network counters.
+- Added mocked privacy, authorization, coordinate, marker, UI-action, traffic and sound regression coverage. This package requires live multiplayer/audio/UI testing and is not a verified cross-layer release.
+
 ## 0.1.1-beta
 
 ### Changed

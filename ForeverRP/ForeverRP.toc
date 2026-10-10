@@ -2,8 +2,8 @@
 ## Title: ForeverRP
 ## Notes: Roleplaying profiles and proximity-based RP discovery for World of Warcraft Forever.
 ## Author: JarlOdinsson
-## Version: 0.1.1-beta.6
-## X-ForeverRP-Build: public-cleanup-20261010-6
+## Version: 0.1.1-beta.8
+## X-ForeverRP-Build: directory-consent-20261010-8
 ## SavedVariables: ForeverRPDB
 ## SavedVariablesPerCharacter: ForeverRPCharacterDB
 
@@ -26,6 +26,8 @@ Discovery\Presence.lua
 Discovery\Privacy.lua
 Discovery\Communication.lua
 Discovery\ProfileTransfer.lua
+Discovery\ProfileAuthorization.lua
+Discovery\Activity.lua
 Discovery\Range.lua
 Discovery\NearbyPlayers.lua
 Discovery\PlayerDetection.lua
@@ -34,6 +36,9 @@ Discovery\MSPCompatibility.lua
 UI\Notifications.lua
 UI\PlayerTooltip.lua
 UI\Settings.lua
+UI\PlayerMarkers.lua
+UI\DiscoveryOptions.lua
+UI\Activity.lua
 Profile\ProfileEditor.lua
 Profile\ProfileViewer.lua
 UI\Nearby.lua

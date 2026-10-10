@@ -24,6 +24,8 @@ lua tests/discovery_diagnostics.lua
 lua tests/observed_discovery.lua
 lua tests/notifications.lua
 lua tests/public_commands.lua
+lua tests/enhanced_discovery.lua
+lua tests/directory.lua
 ```
 
 LuaJIT can replace `lua` in these commands. The Connections suite uses mock
@@ -62,9 +64,31 @@ suffixes, raw transport addresses for discovery and profiles, shared tooltip/sel
 identity, and conflicting/inaccessible complete-name outputs. Retest instructions:
 [IDENTITY_RESOLUTION_RETEST.md](../docs/IDENTITY_RESOLUTION_RETEST.md).
 
-The public-command suite verifies that retired debug, diagnostic, simulation,
-manual HELLO and presence commands cannot reach their old handlers. It also
-checks retained public commands, full names in profile requests, and migration
-of saved debug flags without losing profiles or Connections notes. Diagnostic
-and simulation internals remain available to offline suites; they are not
-public slash commands. Historical diagnostic documents describe older builds.
+The public-command suite verifies restored debug, diagnostic, manual HELLO and
+presence handlers, debug-gated simulation, retained public commands, full names
+in requests, and saved debug migration without losing profiles or notes.
+
+The enhanced-discovery suite exercises real database, privacy, protocol,
+authorization, transfer, activity, Connections and marker code. It covers
+disclosure defaults/persistence, explicit grants, approval/denial/timeout,
+chunk cancellation, cache revocation/lease, bounded retries/prompts/queues,
+opt-in networking, Unknown layers, zone changes, inaccessible/invalid coordinates,
+marker pooling/removal, privacy UI actions, 250-peer caps, receive floods and
+ten minutes of mocked movement with repeated events. Audio tests additionally
+cover MP3/Master selection, nil/failed playback, silence and preview cooldowns.
+Offline mocks do not prove same-layer or cross-layer delivery, audio decoding,
+projection orientation, widget layout or client API behavior.
+
+The directory suite covers shared-cache priority under 260 peers, historical
+guild-trust revocation, bounded notices with raw transport recipients, stale
+revocation cancellation, actual delayed large-profile queues, bounded prefix
+registration recovery, independent directory/location consent, local status/
+zone/name filters, DND withdrawal, AFK and legacy LF RP handling, guarded map
+hierarchies, stationary marker freshness/rotation/zoom, and explicit UI requests.
+It also runs the combined real discovery modules against the reported Forever
+split-name API returns, checks the single shared lifecycle ticker, and verifies
+that bracket changes, metadata opt-out and directory-only peers do not create
+duplicate proximity alerts or bypass unit/range requirements.
+
+Current live test instructions: [DIRECTORY_GUILD_TESTING.md](../docs/DIRECTORY_GUILD_TESTING.md).
+The beta.7 checklist/report are historical and superseded by beta.8.

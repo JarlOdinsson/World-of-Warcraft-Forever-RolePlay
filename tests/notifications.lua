@@ -41,18 +41,24 @@ SetCVar = function() error("must not change global audio settings") end
 C_CVar = {SetCVar = SetCVar}
 dofile("ForeverRP/UI/Notifications.lua")
 local notifications = ForeverRP.Notifications
+Check(db:GetNotificationSettings().soundChoice, "bingbong")
+db:SetNotificationSoundChoice("drumroll")
 for _, level in ipairs({"normal", "remembered", "favorite"}) do
+    now = now + 2
     Check(notifications:PlayDiscoverySound(level), true)
     Check(sounds[#sounds].kit, SOUNDKIT.READY_CHECK)
     Check(sounds[#sounds].channel, "Master")
 end
 db:SetNotificationSoundChannel("SFX")
+now = now + 2
 notifications:PlayDiscoverySound()
 Check(sounds[#sounds].channel, "SFX")
 db:SetNotificationSetting("sound", false)
+now = now + 2
 notifications.notifiedAt["Peer-Realm"] = 99
 Check(notifications:TestSound(), true)
 Check(notifications:TestSound(), false)
+
 Check(#sounds, 5)
 Check(notifications.notifiedAt["Peer-Realm"], 99)
 Check(db:GetNotificationSettings().sound, false)
@@ -65,6 +71,25 @@ Check(message, ForeverRP:GetText("NOTIFICATION_SOUND_UNAVAILABLE"))
 PlaySound = nil
 now = now + 2
 Check(notifications:TestSound(), false)
+
+-- Explicit failure/nil never silently changes the requested channel.
+PlaySound = function(_, channel) Check(channel, "SFX"); return nil end
+now = now + 2
+Check(notifications:TestSound(), false)
+PlaySoundFile = function(path, channel)
+    Check(path, "Interface\\AddOns\\ForeverRP\\Media\\Sounds\\nyc-bing-bong.mp3")
+    Check(channel, "Master")
+    return true, 42
+end
+db:SetNotificationSoundChoice("bingbong")
+db:SetNotificationSoundChannel("Master")
+now = now + 2
+Check(notifications:TestSound(), true)
+db:SetNotificationSoundChoice("none")
+PlaySoundFile = function() error("None must not play audio") end
+now = now + 2
+Check(notifications:TestSound(), true)
+db:SetNotificationSoundChannel("SFX")
 
 -- Exercise actual settings callbacks rather than duplicating their implementation.
 local Widget = {}

@@ -16,6 +16,7 @@ local ACCOUNT_DEFAULTS = {
                 minimapPulse = true,
                 sound = true,
                 soundChannel = "Master",
+                soundChoice = "bingbong",
                 chat = false,
                 cooldown = 600,
             },
@@ -30,12 +31,15 @@ local ACCOUNT_DEFAULTS = {
             y = -220,
             actions = {},
         },
+        activity = { enabled = false, location = "hidden", markers = false, directory = false, subzone = false },
     },
     connections = {},
 }
 
 local CHARACTER_DEFAULTS = {
     databaseVersion = Addon.Constants.DATABASE_VERSION,
+    profileDisclosure = "public",
+    profileApprovals = {},
 }
 
 Addon.Database = {}
@@ -72,11 +76,32 @@ function Addon.Database:Initialize()
     if type(ForeverRPDB.settings) ~= "table" then
         ForeverRPDB.settings = {}
     end
-    -- Retire persisted development logging when loading a public build.
-    ForeverRPDB.settings.debug = false
+    if ForeverRPDB.settings.debug == nil and type(ForeverRPDB.debug) == "boolean" then
+        ForeverRPDB.settings.debug = ForeverRPDB.debug
+    end
 
+    -- Existing installs keep their sound; only fresh settings default to the clip.
+    local oldDiscovery = ForeverRPDB.settings.discovery
+    local oldNotifications = type(oldDiscovery) == "table" and oldDiscovery.notifications
+    if type(oldNotifications) == "table" and oldNotifications.soundChoice == nil then
+        oldNotifications.soundChoice = "drumroll"
+    end
     MergeDefaults(ForeverRPDB, ACCOUNT_DEFAULTS)
     MergeDefaults(ForeverRPCharacterDB, CHARACTER_DEFAULTS)
+    if type(ForeverRPDB.settings.debug) ~= "boolean" then ForeverRPDB.settings.debug = false end
+    local activity = ForeverRPDB.settings.activity
+    activity.enabled, activity.markers = activity.enabled == true, activity.markers == true
+    activity.directory, activity.subzone = activity.directory == true, activity.subzone == true
+    if activity.location ~= "precise" and activity.location ~= "zone" then activity.location = "hidden" end
+    local disclosure = ForeverRPCharacterDB.profileDisclosure
+    if disclosure ~= "approval" and disclosure ~= "connections" then ForeverRPCharacterDB.profileDisclosure = "public" end
+    local approvalCount = 0
+    for key, value in pairs(ForeverRPCharacterDB.profileApprovals) do
+        approvalCount = approvalCount + 1
+        if type(key) ~= "string" or #key > 100 or value ~= true or approvalCount > 100 then
+            ForeverRPCharacterDB.profileApprovals[key] = nil
+        end
+    end
 
     if type(ForeverRPDB.settings.minimap.visible) ~= "boolean" then
         ForeverRPDB.settings.minimap.visible = true
@@ -113,6 +138,9 @@ function Addon.Database:Initialize()
     end
     if notifications.soundChannel ~= "Master" and notifications.soundChannel ~= "SFX" then
         notifications.soundChannel = "Master"
+    end
+    if notifications.soundChoice ~= "bingbong" and notifications.soundChoice ~= "none" then
+        notifications.soundChoice = "drumroll"
     end
     if type(notifications.chat) ~= "boolean" then
         notifications.chat = false
@@ -234,7 +262,9 @@ function Addon.Database:IsDiscoveryEnabled()
 end
 
 function Addon.Database:SetDiscoveryEnabled(enabled)
+    if Addon.Activity then Addon.Activity:Withdraw() end
     self.account.settings.discovery.enabled = enabled == true
+    if Addon.Activity then Addon.Activity:Reset() end
     if Addon.NearbyPlayers then
         Addon.NearbyPlayers:ReevaluateAll()
     end
@@ -268,7 +298,11 @@ function Addon.Database:SetPrivacyMode(mode, suppressBroadcast)
             if self.account.settings.discovery.privacy == allowed then
                 return true
             end
+            if Addon.Activity then Addon.Activity:Withdraw() end
             self.account.settings.discovery.privacy = allowed
+            if Addon.Activity then Addon.Activity:Reset() end
+            if Addon.ProfileAuthorization then Addon.ProfileAuthorization:Reset() end
+            if Addon.ProfileViewer then Addon.ProfileViewer:Refresh() end
             if Addon.Privacy then
                 Addon.Privacy:ResetRuntimeTrust()
             end
@@ -321,6 +355,54 @@ end
 
 function Addon.Database:GetEmoteBarSettings()
     return self.account.settings.emoteBar
+end
+
+function Addon.Database:GetDisclosureMode()
+    return self.character.profileDisclosure
+end
+
+function Addon.Database:SetDisclosureMode(mode)
+    if mode ~= "public" and mode ~= "approval" and mode ~= "connections" then return false end
+    if self.character.profileDisclosure == mode then return true end
+    self.character.profileDisclosure = mode
+    if Addon.ProfileAuthorization then Addon.ProfileAuthorization:Reset() end
+    return true
+end
+
+function Addon.Database:GetActivitySettings()
+    return self.account.settings.activity
+end
+
+function Addon.Database:SetActivitySetting(key, value)
+    if key == "location" then
+        if value ~= "hidden" and value ~= "zone" and value ~= "precise" then return false end
+    elseif key == "enabled" or key == "markers" or key == "directory" or key == "subzone" then
+        value = value == true
+    else return false end
+    if self.account.settings.activity[key] == value then return true end
+    if key == "markers" then
+        self.account.settings.activity[key] = value
+        if Addon.PlayerMarkers then Addon.PlayerMarkers:Refresh() end
+        return true
+    end
+    if key == "directory" or key == "subzone" then
+        self.account.settings.activity[key] = value
+        if Addon.Activity then
+            Addon.Activity:Changed()
+            if value == false then Addon.Activity:Withdraw() end
+        end
+        return true
+    end
+    if Addon.Activity then Addon.Activity:Withdraw() end
+    self.account.settings.activity[key] = value
+    if Addon.Activity then Addon.Activity:Reset() end
+    return true
+end
+
+function Addon.Database:SetNotificationSoundChoice(choice)
+    if choice ~= "bingbong" and choice ~= "drumroll" and choice ~= "none" then return false end
+    self:GetNotificationSettings().soundChoice = choice
+    return true
 end
 
 function Addon.Database:GetConnections()

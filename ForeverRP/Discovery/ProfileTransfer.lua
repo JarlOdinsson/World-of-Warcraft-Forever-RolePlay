@@ -54,9 +54,10 @@ local function TransportRecipient(characterKey)
     return Addon.Presence.GetTransportRecipient and Addon.Presence:GetTransportRecipient(characterKey) or characterKey
 end
 
-function Addon.ProfileTransfer:CanRespondTo(characterKey)
+function Addon.ProfileTransfer:CanRespondTo(characterKey, messageId)
     return Addon.Database:GetPrivacyMode() ~= "hidden"
         and Addon.Privacy:CanInteract(characterKey, "WHISPER", false)
+        and (not Addon.ProfileAuthorization or Addon.ProfileAuthorization:CanSend(characterKey, messageId))
 end
 
 function Addon.ProfileTransfer:RemoveResponse(responseKey)
@@ -97,7 +98,12 @@ function Addon.ProfileTransfer:ProcessResponseQueue()
     if not response then
         return false
     end
-    if not self:CanRespondTo(response.characterKey) then
+    if response.expiresAt and Now() >= response.expiresAt then
+        self:RemoveResponse(responseKey)
+        if Addon.ProfileAuthorization then Addon.ProfileAuthorization:Status(response.characterKey, response.messageId, "busy") end
+        return self:ProcessResponseQueue()
+    end
+    if not self:CanRespondTo(response.characterKey, response.messageId) then
         self:RemoveResponse(responseKey)
         return self:ProcessResponseQueue()
     end
@@ -108,6 +114,7 @@ function Addon.ProfileTransfer:ProcessResponseQueue()
     local accepted = payload and Addon.Communication:SendPayload(payload, "WHISPER",
         response.transportRecipient, "PROFILE_DATA", response.characterKey)
     if accepted then
+        if Addon.ProfileAuthorization then Addon.ProfileAuthorization:MarkServed(response.characterKey, response.transportRecipient) end
         response.nextChunk = response.nextChunk + 1
         response.retries = 0
         if response.nextChunk > #response.chunks then
@@ -145,6 +152,9 @@ function Addon.ProfileTransfer:SerializeProfile(profile)
     if not sanitized then
         return nil, "invalid profile"
     end
+    -- Older ForeverRP peers only understand IC/OOC/AFK/DND in full profiles.
+    -- The optional directory packet carries the more specific LF RP state.
+    if sanitized.status == "LFRP" then sanitized.status = "IC" end
 
     local fields = {}
     for _, field in ipairs(Addon.Constants.PROFILE_FIELD_ORDER) do
@@ -201,7 +211,7 @@ function Addon.ProfileTransfer:BuildChunks(encoded)
 end
 
 function Addon.ProfileTransfer:SendProfile(characterKey, messageId, recipient)
-    if not self:CanRespondTo(characterKey) then
+    if not self:CanRespondTo(characterKey, messageId) then
         return false, "privacy"
     end
     local peer = PeerKey(characterKey)
@@ -221,6 +231,13 @@ function Addon.ProfileTransfer:SendProfile(characterKey, messageId, recipient)
     if not chunks then
         return false, "profile"
     end
+    -- Admit only work that can complete inside the existing client's timeout.
+    local queuedChunks = #chunks
+    for _, queued in pairs(self.outgoingResponses) do
+        queuedChunks = queuedChunks + #queued.chunks - queued.nextChunk + 1
+    end
+    local delay = Addon.Constants.PROFILE_RESPONSE_CHUNK_DELAY_SECONDS or 0.1
+    if queuedChunks * delay > Addon.Constants.PROFILE_TRANSFER_TIMEOUT - 3 then return false, "busy" end
 
     self.outgoingResponses[responseKey] = {
         characterKey = characterKey,
@@ -229,6 +246,7 @@ function Addon.ProfileTransfer:SendProfile(characterKey, messageId, recipient)
         chunks = chunks,
         nextChunk = 1,
         retries = 0,
+        expiresAt = Now() + Addon.Constants.PROFILE_TRANSFER_TIMEOUT - 1,
     }
     self.outgoingResponseOrder[#self.outgoingResponseOrder + 1] = responseKey
     self.outgoingResponsePeers[peer] = responseKey
@@ -268,11 +286,45 @@ function Addon.ProfileTransfer:HandleRequest(packet, sender, characterKey, simul
     if simulated or Addon.Presence:IsSelf(characterKey) then
         return false
     end
+    if Addon.ProfileAuthorization then
+        return Addon.ProfileAuthorization:HandleRequest(packet, sender, characterKey)
+    end
     return self:SendProfile(characterKey, packet.messageId, sender)
+end
+
+function Addon.ProfileTransfer:HandleStatus(packet, characterKey)
+    if packet.status == "revoked" then
+        Addon.RemoteProfiles:ClearProfile(characterKey)
+        for key in pairs(self.pendingRequests) do
+            if key:sub(1, #characterKey + 1) == string.lower(characterKey) .. "\031" then
+                self.pendingRequests[key], self.incoming[key] = nil, nil
+            end
+        end
+    else
+        local key = TransferKey(characterKey, packet.messageId)
+        local request = self.pendingRequests[key]
+        if not request or request.simulated then return false end
+        if packet.status == "denied" or packet.status == "busy" then
+            self.pendingRequests[key], self.incoming[key] = nil, nil
+            Addon.RemoteProfiles:ClearProfile(characterKey)
+            Addon:Print(packet.status == "busy" and "Profile transfer is busy; try again shortly." or "Profile access was denied.")
+        elseif packet.status == "pending" then
+            if not request.approvalNotice then
+                request.approvalNotice = true
+                request.createdAt = Now() + 30 -- one bounded extension for owner approval
+                Addon:Print("Profile access is waiting for the owner's approval.")
+            end
+        end
+    end
+    if Addon.NearbyUI then Addon.NearbyUI:Refresh() end
+    if Addon.ConnectionsUI then Addon.ConnectionsUI:Refresh() end
+    if Addon.ActivityUI then Addon.ActivityUI:Refresh() end
+    return true
 end
 
 function Addon.ProfileTransfer:CleanupExpired()
     local cutoff = Now() - Addon.Constants.PROFILE_TRANSFER_TIMEOUT
+    local expired = false
     for transferKey, transfer in pairs(self.incoming) do
         if transfer.createdAt < cutoff then
             self.incoming[transferKey] = nil
@@ -281,7 +333,13 @@ function Addon.ProfileTransfer:CleanupExpired()
     for transferKey, request in pairs(self.pendingRequests) do
         if request.createdAt < cutoff then
             self.pendingRequests[transferKey] = nil
+            expired = true
         end
+    end
+    if expired then
+        if Addon.NearbyUI then Addon.NearbyUI:Refresh() end
+        if Addon.ConnectionsUI then Addon.ConnectionsUI:Refresh() end
+        if Addon.ActivityUI then Addon.ActivityUI:Refresh() end
     end
 end
 
@@ -311,7 +369,7 @@ end
 function Addon.ProfileTransfer:CancelDisallowedResponses()
     local cancelled = 0
     for responseKey, response in pairs(self.outgoingResponses) do
-        if not self:CanRespondTo(response.characterKey) then
+        if not self:CanRespondTo(response.characterKey, response.messageId) then
             if self:RemoveResponse(responseKey) then
                 cancelled = cancelled + 1
             end

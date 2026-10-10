@@ -83,6 +83,9 @@ function Addon.Connections:Remember(characterKey, simulated)
 end
 
 function Addon.Connections:Forget(characterKey, simulated)
+    if not simulated and Addon.ProfileAuthorization then
+        Addon.ProfileAuthorization:SetConnectionApproval(characterKey, false)
+    end
     local store = simulated and self.simulated or self:GetStore()
     store[characterKey] = nil
     self:RefreshUI()

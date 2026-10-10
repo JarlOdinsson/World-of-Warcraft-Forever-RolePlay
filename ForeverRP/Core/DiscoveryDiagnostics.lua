@@ -2,7 +2,8 @@ local Addon = ForeverRP
 local Access = Addon.ValueAccess
 
 -- Runtime-only metadata. Never retain packet payloads, profiles or notes.
-local Diagnostics = { peers = {}, sends = {}, pipeline = {}, sequence = 0 }
+local Diagnostics = { peers = {}, sends = {}, pipeline = {}, sequence = 0,
+    counters = {sent = 0, received = 0, throttled = 0, expired = 0} }
 Addon.DiscoveryDiagnostics = Diagnostics
 
 local function Now()
@@ -34,6 +35,8 @@ local function Event(record)
 end
 
 function Diagnostics:RecordSend(kind, channel, accepted, reason, result)
+    if accepted then self.counters.sent = self.counters.sent + 1 end
+    if reason == "throttled" then self.counters.throttled = self.counters.throttled + 1 end
     if kind ~= "HELLO" then return end
     self.lastSend = {at = Now(), channel = Identity(channel), accepted = accepted == true,
         reason = reason, result = Text(result)}
@@ -43,6 +46,7 @@ function Diagnostics:RecordSend(kind, channel, accepted, reason, result)
 end
 
 function Diagnostics:RecordIncoming(kind, sender, characterKey, channel, reason, simulated)
+    if not simulated then self.counters.received = self.counters.received + 1 end
     if simulated or (kind ~= "HELLO" and kind ~= "ACK" and kind ~= "INVALID") then return end
     self.sequence = self.sequence + 1
     local record = {at = Now(), sequence = self.sequence, kind = kind,

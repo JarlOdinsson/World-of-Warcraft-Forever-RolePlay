@@ -94,6 +94,8 @@ function UI:CreateMainWindow()
     self.panels.viewer = Addon.ProfileViewer:Create(content)
     self.panels.settings = self:CreateSettingsPanel(content)
     self.panels.emotes = Addon.EmoteConfigUI:Create(content)
+    self.panels.privacy = Addon.DiscoveryOptions:Create(content)
+    self.panels.activity = Addon.ActivityUI:Create(content)
 
     self.homeButton = CreateNavigationButton(navigation, Addon:GetText("NAV_HOME"), navTitle, function()
         self:ShowPanel("home")
@@ -114,6 +116,8 @@ function UI:CreateMainWindow()
     self.settingsButton = CreateNavigationButton(navigation, Addon:GetText("NAV_SETTINGS"), self.viewerButton, function()
         self:ShowPanel("settings")
     end)
+    self.privacyButton = CreateNavigationButton(navigation, "Privacy", self.settingsButton, function() self:ShowPanel("privacy") end)
+    self.activityButton = CreateNavigationButton(navigation, "RP Directory", self.privacyButton, function() self:ShowPanel("activity") end)
 
     frame:SetScript("OnHide", function()
         Addon.ProfileEditor:Commit()
@@ -157,6 +161,10 @@ function UI:ShowPanel(panelName)
         Addon.EmoteConfigUI:Refresh()
     elseif selected == "viewer" then
         Addon.ProfileViewer:Refresh()
+    elseif selected == "privacy" then
+        Addon.DiscoveryOptions:Refresh()
+    elseif selected == "activity" then
+        Addon.ActivityUI:Refresh()
     end
 end
 

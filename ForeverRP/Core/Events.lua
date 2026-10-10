@@ -106,3 +106,11 @@ end)
 Addon.Events:RegisterOptional("PLAYER_ENTERING_WORLD", function()
     Addon.Communication:OnBroadcastContextChanged()
 end)
+
+Addon.Events:RegisterOptional("ZONE_CHANGED_NEW_AREA", function()
+    if Addon.Activity then Addon.Activity:Changed() end
+end)
+
+Addon.Events:RegisterOptional("MINIMAP_UPDATE_ZOOM", function()
+    if Addon.PlayerMarkers then Addon.PlayerMarkers:Refresh() end
+end)

@@ -5,6 +5,7 @@ local MESSAGE_TYPES = {
     ACK = true,
     PROFILE_REQUEST = true,
     PROFILE_DATA = true,
+    PROFILE_STATUS = true,
 }
 
 local SIMULATED_CHARACTER_KEY = "ForeverRPTester-TestRealm"
@@ -168,6 +169,15 @@ function Addon.Communication:Parse(payload)
         return packet
     end
 
+    if messageType == "PROFILE_STATUS" then
+        local id, status = remainder:match("^([%w%-]+)|(pending)$")
+        if not id then id, status = remainder:match("^([%w%-]+)|(denied)$") end
+        if not id then id, status = remainder:match("^([%w%-]+)|(revoked)$") end
+        if not id then id, status = remainder:match("^([%w%-]+)|(busy)$") end
+        if not id or #id > 24 then return nil, "invalid profile status" end
+        packet.messageId, packet.status = id, status
+        return packet
+    end
     if messageType == "PROFILE_REQUEST" then
         if not remainder:match("^[%w%-]+$") or #remainder > 24 then
             return nil, "invalid request ID"
@@ -387,6 +397,10 @@ function Addon.Communication:StartPresenceLifecycle()
 end
 
 function Addon.Communication:OnAddonMessage(prefix, payload, channel, sender)
+    if Addon.Activity and prefix == Addon.Activity.prefix then
+        Addon.Activity:Receive(payload, channel, sender)
+        return
+    end
     self:HandleIncoming(prefix, payload, channel, sender, false)
 end
 
@@ -435,6 +449,15 @@ function Addon.Communication:HandleIncoming(prefix, payload, channel, sender, si
         return
     end
 
+    -- A withdrawal/control notice is not a renewed presence advertisement.
+    if packet.messageType == "PROFILE_STATUS" then
+        if not simulated and channel == "WHISPER" then
+            RecordIncoming(packet.messageType, sender, characterKey, channel, "accepted", false)
+            Addon.ProfileTransfer:HandleStatus(packet, characterKey)
+        end
+        return
+    end
+
     packet.simulated = simulated == true
     packet.transportRecipient = not simulated and sender or nil
     local updated = Addon.Presence:Update(characterKey, packet)
@@ -455,6 +478,31 @@ function Addon.Communication:HandleIncoming(prefix, payload, channel, sender, si
     elseif packet.messageType == "PROFILE_DATA" then
         Addon.ProfileTransfer:HandleChunk(packet, characterKey, simulated == true)
     end
+end
+
+-- Reuse the verified bool/enum adapters without altering legacy packet semantics.
+function Addon.Communication:RegisterCompatibilityPrefix(prefix)
+    return RegisterPrefix(prefix)
+end
+
+function Addon.Communication:SendActivity(payload, channel, target)
+    if not Addon.Activity or not Addon.Activity.registered or type(payload) ~= "string"
+        or #payload > 200 or not Addon.Privacy:CanBroadcast(channel)
+        or not Addon.Database:IsDiscoveryEnabled() then return false, "privacy-or-unavailable" end
+    if not Addon.Activity:TakeBudget() then return false, "throttled" end
+    return SendAddonPacket(Addon.Activity.prefix, payload, channel, target)
+end
+
+-- Zero-content revocation to a previously served recipient; never an advertisement.
+function Addon.Communication:SendRevocation(peer, recipient)
+    if not self:CanBroadcast() or not Addon.ProfileAuthorization
+        or not Addon.ProfileAuthorization.served[string.lower(peer)] then return false end
+    local target = recipient or Addon.ProfileAuthorization.served[string.lower(peer)].recipient
+    if not Addon.ValueAccess:IsString(target) then return false end
+    local payload = self:Serialize("PROFILE_STATUS", "REVOKE", "revoked")
+    local accepted, reason, result = SendAddonPacket(Addon.Constants.COMMUNICATION_PREFIX, payload, "WHISPER", target)
+    RecordSend("PROFILE_STATUS", "WHISPER", accepted, reason, result)
+    return accepted
 end
 
 function Addon.Communication:GetSimulatedCharacterKey()

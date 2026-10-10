@@ -3,7 +3,7 @@ local Addon = ForeverRP
 Addon.Constants = {
     ADDON_NAME = "ForeverRP",
     ADDON_DISPLAY_NAME = "ForeverRP",
-    DIAGNOSTIC_BUILD = "public-cleanup-20261010-6",
+    DIAGNOSTIC_BUILD = "directory-consent-20261010-8",
     PROTOCOL_VERSION = 1,
     DATABASE_VERSION = 1,
     COMMUNICATION_PREFIX = "FOREVERRP",
@@ -35,7 +35,7 @@ Addon.Constants = {
     EMOTE_BAR_DEFAULT_SLOTS = 6,
     EMOTE_BAR_SCALES = { 0.75, 1, 1.25, 1.5 },
     CONNECTION_NOTE_LIMIT = 500,
-    PROFILE_STATUSES = { "IC", "OOC", "AFK", "DND" },
+    PROFILE_STATUSES = { "IC", "LFRP", "OOC", "AFK", "DND" },
     PROFILE_FIELD_ORDER = {
         "rpName",
         "title",

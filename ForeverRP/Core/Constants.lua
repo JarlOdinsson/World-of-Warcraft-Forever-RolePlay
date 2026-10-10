@@ -3,6 +3,7 @@ local Addon = ForeverRP
 Addon.Constants = {
     ADDON_NAME = "ForeverRP",
     ADDON_DISPLAY_NAME = "ForeverRP",
+    DIAGNOSTIC_BUILD = "discovery-sound-20261009-5",
     PROTOCOL_VERSION = 1,
     DATABASE_VERSION = 1,
     COMMUNICATION_PREFIX = "FOREVERRP",

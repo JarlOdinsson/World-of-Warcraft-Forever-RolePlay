@@ -47,7 +47,7 @@ local function SendAddonPacket(prefix, payload, channel, target)
     end
     local result = send(prefix, payload, channel, target)
     if IsSuccess(result, "SendAddonMessageResult") then
-        return true, "accepted"
+        return true, "accepted", result
     end
     if type(result) == "number" and (result == EnumValue("SendAddonMessageResult", "AddonMessageThrottle", 3)
         or result == EnumValue("SendAddonMessageResult", "ChannelThrottle", 8)) then
@@ -58,6 +58,18 @@ end
 
 local function Now()
     return GetTime and GetTime() or 0
+end
+
+local function RecordSend(kind, channel, accepted, reason, result)
+    if Addon.DiscoveryDiagnostics then
+        Addon.DiscoveryDiagnostics:RecordSend(kind, channel, accepted, reason, result)
+    end
+end
+
+local function RecordIncoming(kind, sender, characterKey, channel, reason, simulated)
+    if Addon.DiscoveryDiagnostics then
+        Addon.DiscoveryDiagnostics:RecordIncoming(kind, sender, characterKey, channel, reason, simulated)
+    end
 end
 
 local function ChannelSignature(channels)
@@ -208,35 +220,43 @@ function Addon.Communication:SelectBroadcastChannel()
     return self:GetBroadcastChannels()[1]
 end
 
-function Addon.Communication:Send(messageType, channel, target)
+function Addon.Communication:Send(messageType, channel, target, lookupKey)
     if not self:CanBroadcast() or type(channel) ~= "string" then
+        RecordSend(messageType, channel, false, not self:CanBroadcast() and "prefix-unregistered" or "no-channel")
         return false
     end
     local payload = self:Serialize(messageType)
     if not payload then
+        RecordSend(messageType, channel, false, "serialization-failed")
         return false
     end
 
-    return self:SendPayload(payload, channel, target, messageType)
+    return self:SendPayload(payload, channel, target, messageType, lookupKey)
 end
 
-function Addon.Communication:SendPayload(payload, channel, target, debugLabel)
+function Addon.Communication:SendPayload(payload, channel, target, debugLabel, lookupKey)
     if not self:CanBroadcast() or type(payload) ~= "string"
         or #payload == 0 or #payload > Addon.Constants.MAX_MESSAGE_BYTES then
+        RecordSend(debugLabel, channel, false, not self:CanBroadcast() and "prefix-unregistered" or "invalid-payload")
         return false
     end
     if target then
-        local characterKey = Addon.Presence:NormalizeCharacterKey(target)
-        if not characterKey or not Addon.Privacy:CanInteract(characterKey, channel, false) then
+        local recipientKey = Addon.Presence:NormalizeCharacterKey(target)
+        local characterKey = lookupKey and Addon.Presence:NormalizeCharacterKey(lookupKey) or recipientKey
+        if not recipientKey or not characterKey or string.lower(recipientKey) ~= string.lower(characterKey)
+            or not Addon.Privacy:CanInteract(characterKey, channel, false) then
+            RecordSend(debugLabel, channel, false, "identity-or-privacy")
             Addon:Debug(debugLabel or "Packet", "suppressed by privacy")
             return false
         end
     elseif not Addon.Privacy:CanBroadcast(channel) then
+        RecordSend(debugLabel, channel, false, "privacy")
         Addon:Debug(debugLabel or "Packet", "broadcast suppressed by privacy")
         return false
     end
     -- Acceptance by the client is not confirmation of delivery to another player.
     local accepted, reason, result = SendAddonPacket(Addon.Constants.COMMUNICATION_PREFIX, payload, channel, target)
+    RecordSend(debugLabel, channel, accepted, reason, result)
     if accepted then
         Addon:Debug(debugLabel or "Packet", "accepted for enqueueing via", channel)
         return true, "accepted"
@@ -248,6 +268,7 @@ end
 function Addon.Communication:SendHello(channels)
     channels = channels or self:GetBroadcastChannels()
     if #channels == 0 then
+        RecordSend("HELLO", nil, false, "no-eligible-channel")
         return false, nil, 0
     end
 
@@ -278,6 +299,7 @@ function Addon.Communication:SendInitialHello(channels)
     end
     channels = channels or self:GetBroadcastChannels()
     if #channels == 0 or self.initialRetryAttempts >= Addon.Constants.PRESENCE_MAX_RETRIES then
+        RecordSend("HELLO", nil, false, #channels == 0 and "no-eligible-channel" or "retry-limit")
         return false
     end
     self.initialRetryAttempts = self.initialRetryAttempts + 1
@@ -375,12 +397,14 @@ function Addon.Communication:HandleIncoming(prefix, payload, channel, sender, si
 
     local characterKey = Addon.Presence:NormalizeCharacterKey(sender)
     if not characterKey then
+        RecordIncoming("INVALID", sender, nil, channel, "invalid-sender", simulated)
         Addon:Debug("Malformed packet ignored: invalid sender")
         return
     end
 
     local packet, reason = self:Parse(payload)
     if not packet then
+        RecordIncoming("INVALID", sender, characterKey, channel, reason, simulated)
         if reason == "unsupported protocol" then
             Addon:Debug(Addon:GetText("UNSUPPORTED_PROTOCOL"))
         else
@@ -390,27 +414,39 @@ function Addon.Communication:HandleIncoming(prefix, payload, channel, sender, si
     end
 
     if Addon.Presence:IsSelf(characterKey) then
+        RecordIncoming(packet.messageType, sender, characterKey, channel, "self", simulated)
         return
     end
 
     if not Addon.Privacy:CanInteract(characterKey, channel, simulated == true) then
+        RecordIncoming(packet.messageType, sender, characterKey, channel, "privacy", simulated)
         Addon:Debug(packet.messageType, "ignored by privacy policy", characterKey)
         return
     end
 
     local presenceMessage = packet.messageType == "HELLO" or packet.messageType == "ACK"
+    if presenceMessage and not simulated and channel == "WHISPER"
+        and Addon.ObservedDiscovery and not Addon.ObservedDiscovery:Enabled() then
+        RecordIncoming(packet.messageType, sender, characterKey, channel, "discovery-disabled", false)
+        return
+    end
     if not presenceMessage and not Addon.Presence:IsConfirmed(characterKey, simulated == true) then
         Addon:Debug(packet.messageType, "ignored from unconfirmed sender", characterKey)
         return
     end
 
     packet.simulated = simulated == true
-    Addon.Presence:Update(characterKey, packet)
+    packet.transportRecipient = not simulated and sender or nil
+    local updated = Addon.Presence:Update(characterKey, packet)
+    RecordIncoming(packet.messageType, sender, characterKey, channel,
+        updated and "accepted" or "presence-update-rejected", simulated)
     Addon:Debug(packet.messageType, "received from", characterKey, "via", channel or "unknown")
 
     if packet.messageType == "HELLO" then
         if simulated then
             Addon:Debug("ACK response exercised for simulated HELLO; transport suppressed")
+        elseif channel == "WHISPER" and Addon.ObservedDiscovery then
+            Addon.ObservedDiscovery:Reply(sender, characterKey)
         else
             self:Send("ACK", "WHISPER", sender)
         end

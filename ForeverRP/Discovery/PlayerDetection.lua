@@ -8,43 +8,10 @@ Addon.PlayerDetection = {
 }
 
 local function ResolveCharacterKey(unit)
-    if not ValueAccess:IsString(unit) or not UnitExists or not UnitIsPlayer then
-        return nil
-    end
-    local exists = UnitExists(unit)
-    if not ValueAccess:CanAccess(exists) or (exists ~= true and exists ~= 1) then
-        return nil
-    end
-    local isPlayer = UnitIsPlayer(unit)
-    if not ValueAccess:CanAccess(isPlayer) or (isPlayer ~= true and isPlayer ~= 1) then
-        return nil
-    end
-    local name, realm
-    if UnitFullName then
-        name, realm = UnitFullName(unit)
-    end
-    if not ValueAccess:CanAccess(name, realm) then
-        return nil
-    end
-    if not name and UnitName then
-        name, realm = UnitName(unit)
-        if not ValueAccess:CanAccess(name, realm) then
-            return nil
-        end
-    end
-    if not ValueAccess:IsString(name) then
-        return nil
-    end
-    if realm ~= nil and not ValueAccess:IsString(realm) then
-        return nil
-    end
-    if realm and realm ~= "" then
-        return Addon.Presence:NormalizeCharacterKey(name .. "-" .. realm)
-    end
-    return Addon.Presence:NormalizeCharacterKey(name)
+    return Addon.Presence:ResolveUnitIdentity(unit)
 end
 
-local function AddAssociation(characterKey, unit, source, simulated)
+local function AddAssociation(characterKey, unit, source, simulated, recipient)
     if not ValueAccess:IsString(characterKey) or not ValueAccess:IsString(unit) then
         return false
     end
@@ -53,6 +20,7 @@ local function AddAssociation(characterKey, unit, source, simulated)
         unit = unit,
         source = source,
         simulated = simulated == true,
+        transportRecipient = recipient,
     }
     Addon.PlayerDetection.characters[characterKey] = Addon.PlayerDetection.characters[characterKey] or {}
     Addon.PlayerDetection.characters[characterKey][unit] = true
@@ -80,7 +48,7 @@ function Addon.PlayerDetection:RemoveUnit(unit)
         end
     end
     Addon:Debug("Player unit removed:", unit, characterKey)
-    Addon.NearbyPlayers:Reevaluate(characterKey)
+    Addon.NearbyPlayers:Reevaluate(characterKey, "unit-removed")
     return true
 end
 
@@ -88,7 +56,7 @@ function Addon.PlayerDetection:DetectUnit(unit, source)
     if not ValueAccess:IsString(unit) then
         return false
     end
-    local characterKey = ResolveCharacterKey(unit)
+    local characterKey, recipient = ResolveCharacterKey(unit)
     if not characterKey or Addon.Presence:IsSelf(characterKey) then
         self:RemoveUnit(unit)
         return false
@@ -98,7 +66,7 @@ function Addon.PlayerDetection:DetectUnit(unit, source)
     if existing and existing.characterKey ~= characterKey then
         self:RemoveUnit(unit)
     end
-    if not AddAssociation(characterKey, unit, source, false) then
+    if not AddAssociation(characterKey, unit, source, false, recipient) then
         return false
     end
     if not existing or existing.characterKey ~= characterKey then
@@ -107,7 +75,10 @@ function Addon.PlayerDetection:DetectUnit(unit, source)
     if Addon.MSPCompatibility then
         Addon.MSPCompatibility:ObserveUnit(unit, characterKey, source)
     end
-    Addon.NearbyPlayers:Reevaluate(characterKey)
+    if Addon.ObservedDiscovery then
+        Addon.ObservedDiscovery:Observe(characterKey)
+    end
+    Addon.NearbyPlayers:Reevaluate(characterKey, "unit-detected")
     return true
 end
 

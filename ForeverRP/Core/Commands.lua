@@ -24,6 +24,10 @@ end
 function Addon.Commands:Handle(message)
     local rawCommand = Trim(message)
     local command = string.lower(rawCommand)
+    if command == "diag" or command:match("^diag%s+") then
+        Addon.DiscoveryDiagnostics:Report(rawCommand:match("^%S+%s+(.+)$"))
+        return
+    end
     if command == "" then
         Addon.UI:Show("home")
         return
@@ -123,6 +127,7 @@ function Addon.Commands:Handle(message)
 
     if command == "version" then
         Addon:Print(string.format(Addon:GetText("VERSION_ADDON"), Addon.Constants.ADDON_VERSION))
+        Addon:Print("Build: " .. Addon.Constants.DIAGNOSTIC_BUILD)
         Addon:Print(string.format(Addon:GetText("VERSION_PROTOCOL"), Addon.Constants.PROTOCOL_VERSION))
         Addon:Print(string.format(Addon:GetText("VERSION_DATABASE"), Addon.Constants.DATABASE_VERSION))
         return

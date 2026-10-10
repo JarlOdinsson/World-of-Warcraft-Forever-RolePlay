@@ -44,6 +44,57 @@ function Addon.Presence:GetLocalCharacterKey()
     return keys[1]
 end
 
+-- UnitFullName/UnitName on Forever can split "First Last" into two returns.
+-- Only GetUnitName evidence distinguishes that case from a real realm return.
+function Addon.Presence:ResolveUnitIdentity(unit)
+    if not ValueAccess:IsString(unit) then return nil end
+    if unit ~= "player" or UnitExists then
+        if not UnitExists or not UnitIsPlayer then return nil end
+        local exists, player = UnitExists(unit), UnitIsPlayer(unit)
+        if not ValueAccess:CanAccess(exists, player)
+            or (exists ~= true and exists ~= 1) or (player ~= true and player ~= 1) then return nil end
+    end
+    local name, second
+    if UnitFullName then name, second = UnitFullName(unit) end
+    if not ValueAccess:CanAccess(name, second) then return nil end
+    if not name and UnitName then name, second = UnitName(unit) end
+    if not ValueAccess:IsString(name) or not ValueAccess:CanAccess(second)
+        or (second ~= nil and not ValueAccess:IsString(second)) then return nil end
+
+    local combined
+    if GetUnitName then
+        combined = GetUnitName(unit, true)
+        if not ValueAccess:IsString(combined) or combined == "" then return nil end
+    end
+    local characterName, realm, recipient, evidence = name, second, nil, "unit-name-pair"
+    if combined then
+        local fullName, fullRealm = combined:match("^([^%-]+)%-(.+)$")
+        if fullName then
+            -- Preserve an explicitly supplied cross-realm suffix and raw address.
+            characterName, realm, recipient, evidence = fullName, fullRealm, combined, "qualified-GetUnitName"
+        elseif second and second ~= "" and combined == name .. " " .. second then
+            characterName, realm, recipient, evidence = combined, nil, combined, "split-name-GetUnitName"
+        elseif combined == name then
+            recipient, evidence = combined, "GetUnitName-with-unit-realm"
+            -- A genuine realm return is retained when it is not part of GUN's name.
+            if realm and realm ~= "" then recipient = name .. "-" .. realm end
+        else
+            return nil -- conflicting evidence; do not invent separators or aliases
+        end
+    end
+    if not realm or realm == "" then
+        realm = GetNormalizedRealmName and GetNormalizedRealmName()
+        if not ValueAccess:CanAccess(realm) then return nil end
+        if not ValueAccess:IsString(realm) or realm == "" then
+            realm = GetRealmName and GetRealmName()
+        end
+    end
+    if not ValueAccess:IsString(realm) or realm == "" then return nil end
+    local key = self:NormalizeCharacterKey(characterName .. "-" .. realm)
+    if not key then return nil end
+    return key, recipient or (characterName .. "-" .. realm), evidence, characterName
+end
+
 function Addon.Presence:GetLocalCharacterKeys()
     local keys, known = {}, {}
     local function Add(name, realm)
@@ -58,28 +109,15 @@ function Addon.Presence:GetLocalCharacterKeys()
         end
     end
 
-    local name, realm
-    if UnitFullName then
-        name, realm = UnitFullName("player")
+    local key, _, _, name = self:ResolveUnitIdentity("player")
+    if key then
+        keys[#keys + 1] = key
+        known[string.lower(key)] = true
     end
-    Add(name, realm)
-    if (not ValueAccess:IsString(name) or not ValueAccess:IsString(realm)) and UnitName then
-        name, realm = UnitName("player")
-        Add(name, realm)
-    end
-
-    if GetUnitName then
-        local combined = GetUnitName("player", true)
-        if ValueAccess:IsString(combined) then
-            local key = self:NormalizeCharacterKey(combined)
-            if key and not known[string.lower(key)] then
-                known[string.lower(key)] = true
-                keys[#keys + 1] = key
-            end
-        end
-    end
-
     if ValueAccess:IsString(name) then
+        local unitName, unitRealm
+        if UnitFullName then unitName, unitRealm = UnitFullName("player") end
+        if ValueAccess:IsString(unitName) and unitName == name then Add(name, unitRealm) end
         local normalizedRealm = GetNormalizedRealmName and GetNormalizedRealmName()
         Add(name, normalizedRealm)
         local realmName = GetRealmName and GetRealmName()
@@ -157,12 +195,19 @@ function Addon.Presence:Update(characterKey, metadata)
         lastSeen = Now(),
         confirmed = true,
         simulated = metadata.simulated == true,
+        transportRecipient = metadata.simulated ~= true and ValueAccess:IsString(metadata.transportRecipient)
+            and metadata.transportRecipient or nil,
     }
     Addon:Debug("Presence updated:", characterKey)
     if Addon.NearbyPlayers then
-        Addon.NearbyPlayers:Reevaluate(characterKey)
+        Addon.NearbyPlayers:Reevaluate(characterKey, "presence-update")
     end
     return true
+end
+
+function Addon.Presence:GetTransportRecipient(characterKey)
+    local player = self:Get(characterKey, false)
+    return player and player.transportRecipient or characterKey
 end
 
 function Addon.Presence:IsConfirmed(characterKey, includeSimulated)

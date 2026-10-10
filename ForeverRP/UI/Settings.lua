@@ -93,7 +93,7 @@ function Addon.UI:CreateSettingsPanel(parent)
     end)
 
     local notificationsTitle = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    notificationsTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 310, -158)
+    notificationsTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 310, -70)
     notificationsTitle:SetText(Addon:GetText("SETTINGS_NOTIFICATIONS"))
 
     local pulseCheck = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
@@ -116,6 +116,32 @@ function Addon.UI:CreateSettingsPanel(parent)
     chatCheck:SetScript("OnClick", function(button)
         Addon.Database:SetNotificationSetting("chat", button:GetChecked())
     end)
+
+    local soundChannelLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    soundChannelLabel:SetPoint("TOPLEFT", chatCheck, "BOTTOMLEFT", 4, -10)
+    soundChannelLabel:SetText(Addon:GetText("SETTINGS_NOTIFICATION_CHANNEL"))
+    local soundChannelDropdown = CreateFrame("Frame", "ForeverRPNotificationSoundChannelDropdown", panel, "UIDropDownMenuTemplate")
+    soundChannelDropdown:SetPoint("TOPLEFT", soundChannelLabel, "BOTTOMLEFT", -16, -3)
+    UIDropDownMenu_SetWidth(soundChannelDropdown, 100)
+    UIDropDownMenu_Initialize(soundChannelDropdown, function(_, level)
+        for _, channel in ipairs({ "Master", "SFX" }) do
+            local value = channel
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = Addon:GetText("SETTINGS_SOUND_" .. string.upper(value))
+            info.value = value
+            info.checked = Addon.Database:GetNotificationSettings().soundChannel == value
+            info.func = function()
+                Addon.Database:SetNotificationSoundChannel(value)
+                Addon.UI:RefreshSettings()
+            end
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end)
+    local testSound = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    testSound:SetSize(90, 24)
+    testSound:SetPoint("LEFT", soundChannelDropdown, "RIGHT", 0, 2)
+    testSound:SetText(Addon:GetText("SETTINGS_TEST_SOUND"))
+    testSound:SetScript("OnClick", function() Addon.Notifications:TestSound() end)
 
     local emoteTitle = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     emoteTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 310, -318)
@@ -154,7 +180,7 @@ function Addon.UI:CreateSettingsPanel(parent)
     end)
 
     local scaleDropdown = CreateFrame("Frame", "ForeverRPEmoteScaleDropdown", panel, "UIDropDownMenuTemplate")
-    scaleDropdown:SetPoint("LEFT", slotDropdown, "RIGHT", 70, 0)
+    scaleDropdown:SetPoint("LEFT", slotDropdown, "RIGHT", 8, 0)
     UIDropDownMenu_SetWidth(scaleDropdown, 72)
     UIDropDownMenu_Initialize(scaleDropdown, function(_, level)
         for _, scale in ipairs(Addon.Constants.EMOTE_BAR_SCALES) do
@@ -195,6 +221,8 @@ function Addon.UI:CreateSettingsPanel(parent)
     panel.pulseCheck = pulseCheck
     panel.soundCheck = soundCheck
     panel.chatCheck = chatCheck
+    panel.soundChannelDropdown = soundChannelDropdown
+    panel.testSound = testSound
     panel.emoteEnabled = emoteEnabled
     panel.emoteLocked = emoteLocked
     panel.emoteSlotDropdown = slotDropdown
@@ -221,6 +249,9 @@ function Addon.UI:RefreshSettings()
     self.settingsPanel.pulseCheck:SetChecked(notifications.minimapPulse)
     self.settingsPanel.soundCheck:SetChecked(notifications.sound)
     self.settingsPanel.chatCheck:SetChecked(notifications.chat)
+    UIDropDownMenu_SetSelectedValue(self.settingsPanel.soundChannelDropdown, notifications.soundChannel)
+    UIDropDownMenu_SetText(self.settingsPanel.soundChannelDropdown,
+        Addon:GetText("SETTINGS_SOUND_" .. string.upper(notifications.soundChannel)))
     local emoteBar = Addon.EmoteBar:GetSettings()
     self.settingsPanel.emoteEnabled:SetChecked(emoteBar.enabled)
     self.settingsPanel.emoteLocked:SetChecked(emoteBar.locked)

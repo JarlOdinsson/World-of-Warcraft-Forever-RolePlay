@@ -45,16 +45,29 @@ function Addon.Notifications:CanNotify(characterKey)
 end
 
 function Addon.Notifications:PlayDiscoverySound(level)
-    local soundKit
-    if level == "favorite" then
-        soundKit = SOUNDKIT and (SOUNDKIT.READY_CHECK or SOUNDKIT.IG_QUEST_LOG_OPEN)
-    elseif level == "remembered" then
-        soundKit = SOUNDKIT and SOUNDKIT.IG_QUEST_LOG_OPEN
-    end
-    soundKit = soundKit or (SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+    -- Use an audible alert for every connection level, including new players.
+    local soundKit = SOUNDKIT and (SOUNDKIT.READY_CHECK or SOUNDKIT.IG_QUEST_LOG_OPEN)
+    local channel = Addon.Database:GetNotificationSettings().soundChannel
+    if channel ~= "SFX" then channel = "Master" end
     if PlaySound and soundKit then
-        pcall(PlaySound, soundKit, "SFX")
+        local ok, played = pcall(PlaySound, soundKit, channel)
+        return ok and played ~= false
     end
+    return false
+end
+
+function Addon.Notifications:TestSound()
+    local now = Now()
+    if self.lastSoundTest and now - self.lastSoundTest < 2 then
+        return false
+    end
+    self.lastSoundTest = now
+    -- Preview even when automatic sounds are disabled; never consume peer cooldowns.
+    if not self:PlayDiscoverySound() then
+        Addon:Print(Addon:GetText("NOTIFICATION_SOUND_UNAVAILABLE"))
+        return false
+    end
+    return true
 end
 
 function Addon.Notifications:OnNearbyEntered(player)

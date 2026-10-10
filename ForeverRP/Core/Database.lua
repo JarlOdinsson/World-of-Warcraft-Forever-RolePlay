@@ -15,6 +15,7 @@ local ACCOUNT_DEFAULTS = {
             notifications = {
                 minimapPulse = true,
                 sound = true,
+                soundChannel = "Master",
                 chat = false,
                 cooldown = 600,
             },
@@ -113,6 +114,9 @@ function Addon.Database:Initialize()
     end
     if type(notifications.sound) ~= "boolean" then
         notifications.sound = true
+    end
+    if notifications.soundChannel ~= "Master" and notifications.soundChannel ~= "SFX" then
+        notifications.soundChannel = "Master"
     end
     if type(notifications.chat) ~= "boolean" then
         notifications.chat = false
@@ -308,6 +312,14 @@ function Addon.Database:SetNotificationCooldown(seconds)
         return false
     end
     self.account.settings.discovery.notifications.cooldown = math.floor(seconds)
+    return true
+end
+
+function Addon.Database:SetNotificationSoundChannel(channel)
+    if channel ~= "Master" and channel ~= "SFX" then
+        return false
+    end
+    self.account.settings.discovery.notifications.soundChannel = channel
     return true
 end
 

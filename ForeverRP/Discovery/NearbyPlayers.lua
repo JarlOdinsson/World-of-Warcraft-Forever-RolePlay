@@ -10,6 +10,12 @@ local function Now()
     return GetTime and GetTime() or 0
 end
 
+local function Trace(characterKey, reason, unit, range, origin, unitCount)
+    if Addon.DiscoveryDiagnostics then
+        Addon.DiscoveryDiagnostics:RecordEvaluation(characterKey, reason, unit, range, origin, unitCount)
+    end
+end
+
 function Addon.NearbyPlayers:Remove(characterKey, reason)
     if not ValueAccess:IsString(characterKey) then
         return
@@ -27,14 +33,16 @@ function Addon.NearbyPlayers:Remove(characterKey, reason)
     end
 end
 
-function Addon.NearbyPlayers:Reevaluate(characterKey)
+function Addon.NearbyPlayers:Reevaluate(characterKey, origin)
     if not ValueAccess:IsString(characterKey) then
         return
     end
     if not Addon.Database or not Addon.Database:GetAccount() then
+        Trace(characterKey, "database-unavailable", nil, "UNKNOWN", origin, 0)
         return
     end
     if not Addon.Database:IsDiscoveryEnabled() then
+        Trace(characterKey, "discovery-disabled", nil, "UNKNOWN", origin, 0)
         self:Remove(characterKey, "discovery disabled")
         return
     end
@@ -42,6 +50,7 @@ function Addon.NearbyPlayers:Reevaluate(characterKey)
     local includeSimulated = Addon.Database:IsDebugEnabled()
     local presence = Addon.Presence:Get(characterKey, includeSimulated)
     if not presence or not presence.confirmed or Addon.Presence:IsSelf(characterKey) then
+        Trace(characterKey, "presence-unavailable-or-self", nil, "UNKNOWN", origin, 0)
         self:Remove(characterKey, "presence unavailable")
         return
     end
@@ -49,11 +58,14 @@ function Addon.NearbyPlayers:Reevaluate(characterKey)
     local detections = Addon.PlayerDetection:GetUnits(characterKey, includeSimulated)
     local selectedUnit
     local selectedState = "UNKNOWN"
+    local validUnits, lastUnit = 0, nil
     local radius = Addon.Database:GetDiscoveryRadius()
     for _, detection in ipairs(detections) do
         if detection and ValueAccess:IsString(detection.unit)
             and ValueAccess:IsString(detection.characterKey)
             and Addon.PlayerDetection:IsValid(detection) then
+            validUnits = validUnits + 1
+            lastUnit = detection.unit
             local inRange, rangeState = Addon.Range:IsWithin(detection.unit, radius, characterKey)
             if inRange then
                 selectedUnit = detection.unit
@@ -66,11 +78,17 @@ function Addon.NearbyPlayers:Reevaluate(characterKey)
     end
 
     if not selectedUnit then
+        local reason = #detections == 0 and "no-unit-association"
+            or (validUnits == 0 and "unit-disappeared-or-identity-changed"
+            or (selectedState == "UNKNOWN" and "range-unknown"
+            or (selectedState == "OVER_30" and "range-outside-configured-radius" or "range-bracket-insufficient-for-radius")))
+        Trace(characterKey, reason, lastUnit, selectedState, origin, #detections)
         self:Remove(characterKey, selectedState)
         return
     end
 
     local previous = self.players[characterKey]
+    Trace(characterKey, "eligible", selectedUnit, selectedState, origin, #detections)
     self.players[characterKey] = {
         characterKey = characterKey,
         unit = selectedUnit,
@@ -80,8 +98,10 @@ function Addon.NearbyPlayers:Reevaluate(characterKey)
         rangeState = selectedState,
         simulated = presence.simulated == true,
     }
-    if not previous or previous.rangeState ~= selectedState or previous.unit ~= selectedUnit then
+    if not previous then
         Addon:Debug("Player entered discovery range:", characterKey, selectedState)
+    elseif previous.rangeState ~= selectedState or previous.unit ~= selectedUnit then
+        Addon:Debug("Player discovery range updated:", characterKey, selectedState)
     end
     if not previous and Addon.Connections then
         Addon.Connections:RecordEncounter(characterKey, presence.simulated == true)
@@ -158,6 +178,7 @@ function Addon.NearbyPlayers:Initialize()
     self.initialized = true
     if C_Timer and C_Timer.NewTicker then
         self.ticker = C_Timer.NewTicker(1, function()
+            if Addon.ObservedDiscovery then Addon.ObservedDiscovery:Tick() end
             self:ReevaluateAll()
         end)
     end

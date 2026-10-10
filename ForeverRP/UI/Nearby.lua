@@ -108,6 +108,9 @@ function Addon.NearbyUI:SelectPlayer(characterKey, simulated)
 end
 
 function Addon.NearbyUI:Refresh()
+    if Addon.DiscoveryDiagnostics then
+        Addon.DiscoveryDiagnostics:RecordUIRefresh(self.panel ~= nil)
+    end
     if not self.panel then
         return
     end
@@ -147,5 +150,8 @@ function Addon.NearbyUI:Refresh()
             row.characterKey = player.characterKey
             row.simulated = player.simulated == true
         end
+    end
+    if Addon.DiscoveryDiagnostics then
+        Addon.DiscoveryDiagnostics:CompleteUIRefresh(#players)
     end
 end

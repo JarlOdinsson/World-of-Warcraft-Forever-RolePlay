@@ -50,6 +50,10 @@ local function PeerKey(characterKey)
     return string.lower(characterKey)
 end
 
+local function TransportRecipient(characterKey)
+    return Addon.Presence.GetTransportRecipient and Addon.Presence:GetTransportRecipient(characterKey) or characterKey
+end
+
 function Addon.ProfileTransfer:CanRespondTo(characterKey)
     return Addon.Database:GetPrivacyMode() ~= "hidden"
         and Addon.Privacy:CanInteract(characterKey, "WHISPER", false)
@@ -101,7 +105,8 @@ function Addon.ProfileTransfer:ProcessResponseQueue()
     local payload = Addon.Communication:Serialize(
         "PROFILE_DATA", response.messageId, response.nextChunk, #response.chunks, response.chunks[response.nextChunk]
     )
-    local accepted = payload and Addon.Communication:SendPayload(payload, "WHISPER", response.characterKey, "PROFILE_DATA")
+    local accepted = payload and Addon.Communication:SendPayload(payload, "WHISPER",
+        response.transportRecipient, "PROFILE_DATA", response.characterKey)
     if accepted then
         response.nextChunk = response.nextChunk + 1
         response.retries = 0
@@ -195,7 +200,7 @@ function Addon.ProfileTransfer:BuildChunks(encoded)
     return chunks
 end
 
-function Addon.ProfileTransfer:SendProfile(characterKey, messageId)
+function Addon.ProfileTransfer:SendProfile(characterKey, messageId, recipient)
     if not self:CanRespondTo(characterKey) then
         return false, "privacy"
     end
@@ -219,6 +224,7 @@ function Addon.ProfileTransfer:SendProfile(characterKey, messageId)
 
     self.outgoingResponses[responseKey] = {
         characterKey = characterKey,
+        transportRecipient = recipient or TransportRecipient(characterKey),
         messageId = messageId,
         chunks = chunks,
         nextChunk = 1,
@@ -247,7 +253,8 @@ function Addon.ProfileTransfer:Request(value)
 
     local messageId = self:CreateMessageId()
     local payload = Addon.Communication:Serialize("PROFILE_REQUEST", messageId)
-    if not payload or not Addon.Communication:SendPayload(payload, "WHISPER", characterKey, "PROFILE_REQUEST") then
+    if not payload or not Addon.Communication:SendPayload(payload, "WHISPER",
+        TransportRecipient(characterKey), "PROFILE_REQUEST", characterKey) then
         return false, "send"
     end
     self.pendingRequests[TransferKey(characterKey, messageId)] = {
@@ -261,7 +268,7 @@ function Addon.ProfileTransfer:HandleRequest(packet, sender, characterKey, simul
     if simulated or Addon.Presence:IsSelf(characterKey) then
         return false
     end
-    return self:SendProfile(characterKey, packet.messageId)
+    return self:SendProfile(characterKey, packet.messageId, sender)
 end
 
 function Addon.ProfileTransfer:CleanupExpired()

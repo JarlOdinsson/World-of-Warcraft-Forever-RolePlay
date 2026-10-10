@@ -25,10 +25,13 @@ Addon.Range = {
 
 local function InteractionCheck(unit, index)
     if not ValueAccess:IsString(unit) or not CheckInteractDistance then
-        return false
+        return nil
     end
     local result = CheckInteractDistance(unit, index)
-    return ValueAccess:CanAccess(result) and (result == true or result == 1)
+    if not ValueAccess:CanAccess(result) then return nil end
+    if result == true or result == 1 then return true end
+    if result == false or result == 0 then return false end
+    return nil
 end
 
 function Addon.Range:GetRangeState(unit, characterKey)
@@ -53,14 +56,20 @@ function Addon.Range:GetRangeState(unit, characterKey)
         return "UNKNOWN"
     end
 
-    if InteractionCheck(unit, 3) then
+    local close = InteractionCheck(unit, 3)
+    if close == true then
         return "WITHIN_10"
     end
-    if InteractionCheck(unit, 2) then
+    local trade = InteractionCheck(unit, 2)
+    if trade == true then
         return "WITHIN_15"
     end
-    if InteractionCheck(unit, 1) or InteractionCheck(unit, 4) then
+    local inspect, follow = InteractionCheck(unit, 1), InteractionCheck(unit, 4)
+    if inspect == true or follow == true then
         return "WITHIN_30"
+    end
+    if close == nil or trade == nil or inspect == nil or follow == nil then
+        return "UNKNOWN"
     end
     return "OVER_30"
 end

@@ -87,7 +87,7 @@ f:Report("Peer-Realm")
 Check(Contains(f.lines, "no-eligible-channel"), true)
 Check(Contains(f.lines, "transport=C_ChatInfo.SendAddonMessage"), true)
 Check(Contains(f.lines, "no-confirmed-presence"), true)
-Check(Contains(f.lines, "build=privacy-clarity-20261010-10"), true)
+Check(Contains(f.lines, "build=directory-transport-20261010-11"), true)
 Check(f.diag:Report("Peer-Realm"), false)
 
 f.party = true

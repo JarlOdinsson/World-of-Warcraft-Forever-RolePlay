@@ -134,11 +134,76 @@ function Activity:Routes()
     for _, channel in ipairs(Addon.Communication:GetBroadcastChannels()) do
         routes[#routes + 1] = {channel = channel}
     end
-    if Addon.Database:GetPrivacyMode() == "visible" and GetChannelName then
-        local id = GetChannelName(self.channelName)
-        if Number(id, 1000) and id > 0 then routes[#routes + 1] = {channel = "CHANNEL", target = tostring(id)} end
+    if Addon.Database:GetPrivacyMode() == "visible" then
+        local id = self:SharedChannelID()
+        if id then routes[#routes + 1] = {channel = "CHANNEL", target = tostring(id)} end
     end
     return routes
+end
+
+function Activity:SharedChannelID()
+    local id = GetChannelName and GetChannelName(self.channelName)
+    return Number(id, 1000) and id > 0 and id == math.floor(id) and id or nil
+end
+
+function Activity:MaintainChannel(now)
+    if Addon.Database:GetPrivacyMode() ~= "visible" then return end
+    local id = self:SharedChannelID()
+    if id then
+        self.joined, self.joinAttempts, self.joinAt = true, 0, nil
+        return
+    end
+    -- Recover a lost confirmed membership. A join call alone is not evidence.
+    if self.joined then self.joinAttempts, self.joinAt = 0, nil end
+    self.joined = false
+    if not JoinChannelByName or (self.joinAttempts or 0) >= 3 or now < (self.joinAt or 0) then return end
+    self.joinAttempts = (self.joinAttempts or 0) + 1
+    self.joinAt, self.joinRequested = now + 10, true
+    JoinChannelByName(self.channelName)
+end
+
+function Activity:OnWorldChanged()
+    -- Rearm exhausted joins on a real reconnect/world transition, not chat noise.
+    local now = Now()
+    if self.worldRetryAt and now < self.worldRetryAt then return end
+    self.worldRetryAt = now + 30
+    self.joinAttempts, self.joinAt = 0, nil
+    if not self.registered then self.registrationAttempts, self.registrationAt = 0, 0 end
+end
+
+function Activity:ReportTransport()
+    local function Safe(value)
+        if not Access:CanAccess(value) then return "unavailable" end
+        return Addon:EscapePlainText(tostring(value == nil and "none" or value))
+    end
+    local id = self:SharedChannelID()
+    Addon:Print("Directory transport: build=" .. Addon.Constants.DIAGNOSTIC_BUILD
+        .. " eligible=" .. tostring(self:Enabled()) .. " prefix=" .. tostring(self.registered == true)
+        .. " sendAPI=" .. ((C_ChatInfo and C_ChatInfo.SendAddonMessage or SendAddonMessage) and "available" or "unavailable"))
+    Addon:Print("Shared channel: " .. self.channelName .. " localID=" .. Safe(id)
+        .. " membership=" .. (id and "observed" or "not-observed")
+        .. " joinAttempts=" .. (self.joinAttempts or 0) .. "/3"
+        .. ((self.joinAttempts or 0) >= 3 and " (stopped; retry on world transition/reload/settings reset)" or ""))
+    local routes = {}
+    for _, route in ipairs(self:Routes()) do routes[#routes + 1] = route.channel .. ":" .. (route.target or "broadcast") end
+    Addon:Print("Directory routes: " .. (#routes > 0 and table.concat(routes, ", ") or "none")
+        .. "; queued=" .. #(self.queue or {}))
+    for _, blocker in ipairs(self:GetNetworkingBlockers()) do Addon:Print(blocker) end
+    for _, channel in ipairs({"CHANNEL", "PARTY", "RAID", "INSTANCE_CHAT", "GUILD"}) do
+        local sent, received = (self.lastSends or {})[channel], (self.lastReceives or {})[channel]
+        if sent then
+            Addon:Print("Directory send " .. channel .. " target=" .. Safe(sent.target)
+                .. " age=" .. math.max(0, math.floor(Now() - sent.at)) .. "s enqueue="
+                .. (sent.accepted and "accepted" or "rejected") .. " reason=" .. Safe(sent.reason)
+                .. " result=" .. Safe(sent.result))
+        end
+        if received then
+            Addon:Print("Directory remote receipt " .. channel .. " sender=[" .. Safe(received.sender)
+                .. "] age=" .. math.max(0, math.floor(Now() - received.at)) .. "s localID="
+                .. Safe(received.localID) .. " name=[" .. Safe(received.name) .. "]")
+        end
+    end
+    Addon:Print("Enqueue is not delivery. Shared-channel/cross-layer coverage is unverified; layer remains Unknown.")
 end
 
 function Activity:Withdraw()
@@ -150,8 +215,10 @@ function Activity:Withdraw()
 end
 
 function Activity:Reset()
-    if self.joined and LeaveChannelByName then LeaveChannelByName(self.channelName) end
+    if (self.joined or self.joinRequested) and LeaveChannelByName then LeaveChannelByName(self.channelName) end
     self.joined = false
+    self.joinRequested, self.joinAttempts, self.joinAt = nil, 0, nil
+    self.routeSignature, self.retryAt = nil, nil
     for _, entry in ipairs(Addon.Presence:GetActivityRecords()) do Addon.Presence:ClearActivity(entry.characterKey) end
     self.queue, self.lastPayload, self.nextAt = {}, nil, 0
     self.lastLocation, self.heartbeatAt = nil, 0
@@ -183,12 +250,9 @@ function Activity:Tick()
     if not self.wasEnabled then
         self.wasEnabled = true
         self.registered = false
-        if Addon.Database:GetPrivacyMode() == "visible" and JoinChannelByName then
-            -- Explicit opt-in only. Never send visible chat messages or poll rosters.
-            JoinChannelByName(self.channelName)
-            self.joined = true
-        end
     end
+    -- Explicit opt-in only. Never send visible chat messages or poll rosters.
+    self:MaintainChannel(now)
     if not self.registered and (self.registrationAttempts or 0) < 3 and now >= (self.registrationAt or 0) then
         self.registrationAttempts = (self.registrationAttempts or 0) + 1
         self.registrationAt = now + 10
@@ -196,6 +260,15 @@ function Activity:Tick()
     end
     if not self.registered then return end
     self.queue = self.queue or {}
+    local routes, signature = self:Routes(), {}
+    for _, route in ipairs(routes) do signature[#signature + 1] = route.channel .. ":" .. (route.target or "") end
+    signature = table.concat(signature, "|")
+    if signature ~= self.routeSignature then
+        self.routeSignature = signature
+        self.queue = {} -- Drop stale channel numbers and departed social routes.
+        self.lastLocation = nil
+        self.nextAt = math.max(now, (self.lastAnnouncement or (now - 30)) + 30)
+    end
     local payload = self:Payload()
     local current = self:Location()
     local old = self.lastLocation
@@ -213,9 +286,9 @@ function Activity:Tick()
         or old.status ~= Addon.Profile:GetField("status") or old.availability ~= self:Availability()
         or old.subzone ~= Addon.Database:GetActivitySettings().subzone
         or (old.x and current.x and (old.x - current.x)^2 + (old.y - current.y)^2 >= 100)
-    if #self.queue == 0 and now >= (self.nextAt or 0)
+    if #routes > 0 and #self.queue == 0 and now >= (self.nextAt or 0)
         and (useful or now >= (self.heartbeatAt or 0)) then
-        for _, route in ipairs(self:Routes()) do
+        for _, route in ipairs(routes) do
             if #self.queue < 3 then
                 self.queue[#self.queue + 1] = {route = route, payload = payload, attempts = 0}
             end
@@ -232,7 +305,10 @@ function Activity:Tick()
     local queued = self.queue[1]
     if queued and now >= (self.retryAt or 0) then
         -- Rebuild at send time so a privacy/location change cannot leak queued coordinates.
-        local accepted, reason = Addon.Communication:SendActivity(self:Payload(), queued.route.channel, queued.route.target)
+        local accepted, reason, result = Addon.Communication:SendActivity(self:Payload(), queued.route.channel, queued.route.target)
+        self.lastSends = self.lastSends or {}
+        self.lastSends[queued.route.channel] = {at = now, target = queued.route.target,
+            accepted = accepted == true, reason = reason, result = result}
         queued.attempts = queued.attempts + 1
         if accepted then self.counters.sent = self.counters.sent + 1; table.remove(self.queue, 1)
         elseif queued.attempts >= 2 then table.remove(self.queue, 1) end
@@ -246,7 +322,7 @@ function Activity:Tick()
     if Addon.PlayerMarkers then Addon.PlayerMarkers:Refresh() end
 end
 
-function Activity:Receive(payload, channel, sender)
+function Activity:Receive(payload, channel, sender, localID, channelName)
     if not self:Enabled() or not Access:IsString(payload) or #payload > 200
         or not Access:IsString(channel) or not Access:IsString(sender) then return false end
     if channel ~= "CHANNEL" and channel ~= "GUILD" and channel ~= "PARTY"
@@ -299,6 +375,10 @@ function Activity:Receive(payload, channel, sender)
         status = status, availability = availability, region = region, subzone = subzone}
     -- A direct valid exchange proves addon participation, never physical proximity.
     if not Addon.Presence:UpdateActivity(key, entry, version, sender) then return false end
+    entry.receivedVia = channel
+    self.lastReceives = self.lastReceives or {}
+    self.lastReceives[channel] = {at = Now(), sender = sender,
+        localID = Number(localID, 1000), name = Access:IsString(channelName) and channelName:sub(1, 100) or nil}
     self.uiDirty = true
     return true
 end

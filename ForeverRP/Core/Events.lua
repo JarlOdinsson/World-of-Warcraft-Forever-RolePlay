@@ -56,8 +56,8 @@ Addon.Events:Register("PLAYER_LOGOUT", function()
     end
 end)
 
-Addon.Events:Register("CHAT_MSG_ADDON", function(prefix, payload, channel, sender)
-    Addon.Communication:OnAddonMessage(prefix, payload, channel, sender)
+Addon.Events:Register("CHAT_MSG_ADDON", function(...)
+    Addon.Communication:OnAddonMessage(...)
 end)
 
 Addon.Events:RegisterOptional("NAME_PLATE_UNIT_ADDED", function(unit)
@@ -105,6 +105,7 @@ end)
 
 Addon.Events:RegisterOptional("PLAYER_ENTERING_WORLD", function()
     Addon.Communication:OnBroadcastContextChanged()
+    if Addon.Activity then Addon.Activity:OnWorldChanged() end
 end)
 
 Addon.Events:RegisterOptional("ZONE_CHANGED_NEW_AREA", function()

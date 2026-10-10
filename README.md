@@ -4,7 +4,7 @@ ForeverRP provides roleplaying profiles, automatic discovery of consenting Forev
 
 ## Current version
 
-`0.1.1-beta.10` — build `privacy-clarity-20261010-10` (controlled multiplayer test build).
+`0.1.1-beta.11` — build `directory-transport-20261010-11` (controlled multiplayer test build).
 
 Beta.9 fixes the bundled Chomp login/Battle.net parser for Forever multiword names and its related MSP recipient corruption. It adds bounded debug-only tracing of actual whisper recipients. The yellow player-not-found error has a reproducible MSP corruption path, but actual delivery still needs retesting; no speculative discovery address rewrite is included. See [the Beta.9 retest guide](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/BETA9_TRANSPORT_RETEST.md), including shared-library load-order limitations and login/reload tests.
 
@@ -108,3 +108,11 @@ See [tests/README.md](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-
 ForeverRP software is MIT-licensed. Embedded libraries retain their own licenses and notices under `ForeverRP/Libs/MSP` in the source repository (`Libs/MSP` inside the installed addon). The supplied Bing Bong recording has separate redistribution permission; see `Media/Sounds/NOTICE.md`. The software license does not license the recording.
 
 Report bugs at [GitHub Issues](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/issues). Include your `/frp version` output, reproduction steps, privacy mode, and any Lua error. Do not include private notes or personal profile contents.
+
+Beta 11 hardens shared-channel joins and route recovery. Cross-layer Directory
+discovery is a release requirement, with shared-channel delivery still unverified
+on Forever. It does not require mouseover, a visible unit or prior Nearby when
+valid metadata arrives. /frp network distinguishes membership, enqueue results
+and valid remote receipts by transport. Layer remains Unknown; Directory traffic
+does not establish physical proximity. Party/guild receipts alone do not prove
+unrelated-player or cross-layer coverage. The test build does not enable any opt-in.

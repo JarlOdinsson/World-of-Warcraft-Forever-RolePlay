@@ -2,8 +2,8 @@
 ## Title: ForeverRP
 ## Notes: Roleplaying profiles and proximity-based RP discovery for World of Warcraft Forever.
 ## Author: JarlOdinsson
-## Version: 0.1.1-beta.10
-## X-ForeverRP-Build: privacy-clarity-20261010-10
+## Version: 0.1.1-beta.11
+## X-ForeverRP-Build: directory-transport-20261010-11
 ## SavedVariables: ForeverRPDB
 ## SavedVariablesPerCharacter: ForeverRPCharacterDB
 

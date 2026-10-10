@@ -47,6 +47,9 @@ function Addon.Commands:Handle(message)
         return
     end
     if command == "network" then
+        local now = GetTime and GetTime() or 0
+        if self.networkReportAt and now - self.networkReportAt < 5 then return end
+        self.networkReportAt = now
         local activity = Addon.Activity and Addon.Activity.counters or {}
         local legacy = Addon.DiscoveryDiagnostics.counters
         local active, markers = 0, 0
@@ -56,6 +59,7 @@ function Addon.Commands:Handle(message)
             legacy.sent, legacy.received, legacy.throttled, legacy.expired,
             activity.sent or 0, activity.received or 0, activity.throttled or 0, activity.duplicates or 0,
             activity.expired or 0, Addon.ProfileAuthorization and Addon.ProfileAuthorization.denied or 0, active, markers))
+        if Addon.Activity then Addon.Activity:ReportTransport() end
         return
     end
 

@@ -1,9 +1,13 @@
-# ForeverRP beta.8 guild test card
+# ForeverRP beta.11 guild test card
 
-Build **0.1.1-beta.8 / directory-consent-20261010-8**.
+Build **0.1.1-beta.11 / directory-transport-20261010-11**.
 All live scenarios here are **NOT RUN**. Use the same build on both clients.
-Beta.7 is superseded. Experimental networking and Directory participation are
+Earlier test builds are superseded. Experimental networking and Directory participation are
 OFF by default; cross-layer behavior is not established.
+
+The independent shared-channel test is the cross-layer release gate:
+[CROSS_LAYER_DIRECTORY_RETEST.md](CROSS_LAYER_DIRECTORY_RETEST.md). Party/guild
+delivery alone does not pass it. Beta 11 adds transport evidence to /frp network.
 
 ## Setup and useful captures
 
@@ -43,8 +47,8 @@ OFF by default; cross-layer behavior is not established.
 - On both, `/frp privacy`: enable Experimental Network, then independently enable
   Directory participation. Open `/frp directory`. Wait up to two minutes.
   Expected if metadata transport works: character entries, no automatic profile
-  downloads. Location hidden should show no zone/continent/subzone or marker.
-- Choose Zone only; then enable Subzone sharing. Expected permitted zone/subzone
+  downloads. Don't share my location should show no zone/continent/subzone or marker.
+- Choose Share zone only; then enable Subzone sharing. Expected permitted zone/subzone
   and continent if available, no precise marker. Region means continent.
 - Set IC/LF RP/OOC; toggle client AFK and DND. Default lists only IC/LF RP with
   normal availability, expanded filter can include OOC/AFK, DND never appears.

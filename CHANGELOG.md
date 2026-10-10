@@ -2,6 +2,14 @@
 
 All notable user-facing changes to ForeverRP will be documented here.
 
+## 0.1.1-beta.11 — directory-transport-20261010-11 (controlled test build)
+
+- Verify shared-channel membership rather than assuming a join call succeeded; retry at most three times per recovery cycle and rearm on bounded world transitions.
+- Do not consume Directory announcements without a route. Drop stale channel-number/social routes and advertise new routes with the existing minimum interval.
+- Expand `/frp network` with rate-limited membership, prefix, route, enqueue-result and valid remote-receipt evidence, without profile contents or notes.
+- Test Directory discovery without mouseover, visible units or prior Nearby. Actual shared-channel/cross-layer delivery remains unverified; layer stays Unknown.
+- Preserve opt-ins, privacy, existing A1/A2 packets and physical Nearby requirements.
+
 ## 0.1.1-beta.10 — privacy-clarity-20261010-10 (controlled test build)
 
 - Directory lists each settings blocker: discovery disabled, Hidden visibility, Experimental Network OFF.

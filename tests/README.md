@@ -28,6 +28,7 @@ lua tests/enhanced_discovery.lua
 lua tests/directory.lua
 lua tests/forever_transport.lua
 lua tests/privacy_ux.lua
+lua tests/directory_transport.lua
 ```
 
 LuaJIT can replace `lua` in these commands. The Connections suite uses mock
@@ -108,3 +109,11 @@ The privacy UX suite checks all blocker combinations, saved versus effective net
 status, independent location/listing consent, real setter refreshes, panel switching
 and SavedVariables reinitialization. Widget width/line estimates are mocked; they
 do not verify client font rendering, UI scaling or live /reload behavior.
+
+The Directory transport suite exercises delayed/failed joins, membership loss,
+bounded recovery, numeric-channel changes, route changes and send failures.
+It dispatches the real CHAT_MSG_ADDON event and bridges two independent mocked
+clients through the real metadata parser, presence and Directory query, with no
+shared party/guild or remote unit. That bridge deliberately delivers packets:
+it proves no dependency on mouseover or Nearby, not cross-layer server delivery.
+The rate-limited /frp network report distinguishes enqueue from remote receipt.

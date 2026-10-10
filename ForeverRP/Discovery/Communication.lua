@@ -404,9 +404,9 @@ function Addon.Communication:StartPresenceLifecycle()
     end)
 end
 
-function Addon.Communication:OnAddonMessage(prefix, payload, channel, sender)
+function Addon.Communication:OnAddonMessage(prefix, payload, channel, sender, target, zoneChannelID, localID, channelName)
     if Addon.Activity and prefix == Addon.Activity.prefix then
-        Addon.Activity:Receive(payload, channel, sender)
+        Addon.Activity:Receive(payload, channel, sender, localID, channelName)
         return
     end
     self:HandleIncoming(prefix, payload, channel, sender, false)

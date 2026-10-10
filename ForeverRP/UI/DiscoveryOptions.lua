@@ -52,11 +52,12 @@ function Options:Create(parent)
         function() return Addon.Database:GetDisclosureMode() end,
         function(value) Addon.Database:SetDisclosureMode(value) end)
     Text(content, "Public uses existing visibility rules. Approval Required asks before each transfer.\nConnections Only requires both Remember and your explicit approval below.\nAn approval grants access to your full profile; it is not mutual authorization.", 12, -65)
+    self.visibilityStatus = Text(content, "", 12, -110, 460)
     self:Dropdown(content, "ForeverRPLocationDropdown", "Location sharing (experimental network only)", 12, -130,
-        {{"hidden", "Location hidden"}, {"zone", "Zone only"}, {"precise", "Precise location"}},
+        {{"hidden", "Don't share my location"}, {"zone", "Share zone only"}, {"precise", "Share precise location"}},
         function() return Addon.Database:GetActivitySettings().location end,
         function(value) Addon.Database:SetActivitySetting("location", value) end)
-    Text(content, "Hidden visibility always suppresses location. Precise coordinates are voluntary.\nLayer status remains Unknown; coordinates do not prove a shared layer.", 12, -185)
+    Text(content, "Withholding location still allows browsing when networking is enabled.\nHidden Discovery Visibility disables networking and location sharing.\nLayer: Unknown; coordinates do not prove a shared layer.", 12, -185, 460)
     self.experimental = Button(content, "", 12, -230, 230, function()
         Addon.Database:SetActivitySetting("enabled", not Addon.Database:GetActivitySettings().enabled)
         self:Refresh()
@@ -65,7 +66,8 @@ function Options:Create(parent)
         Addon.Database:SetActivitySetting("markers", not Addon.Database:GetActivitySettings().markers)
         self:Refresh()
     end)
-    Text(content, "Experimental networking joins ForeverRPActivity when Visible. Delivery across\nlayers/backend realms is unverified. It defaults off. Markers are neutral and\nnever open or request profiles. Green/blue require reliable layer evidence.", 12, -265)
+    Text(content, "Experimental networking defaults OFF. Cross-layer delivery is unverified.\nMarkers are neutral and never open or request profiles.", 12, -260, 460)
+    self.networkStatus = Text(content, "", 12, -290, 460)
     Button(content, "RP Directory", 12, -320, 150, function() Addon.UI:ShowPanel("activity") end)
     self.directory = Button(content, "", 170, -320, 230, function()
         Addon.Database:SetActivitySetting("directory", not Addon.Database:GetActivitySettings().directory)
@@ -75,7 +77,7 @@ function Options:Create(parent)
         Addon.Database:SetActivitySetting("subzone", not Addon.Database:GetActivitySettings().subzone)
         self:Refresh()
     end)
-    Text(content, "Directory opt-in is separate from Nearby, location and full-profile access.\nLocation hidden omits zone, region and subzone; DND is never listed.", 12, -390)
+    Text(content, "Directory Participation lists your character; OFF still allows browsing.\nDon't share my location omits zone, region and subzone; DND is never listed.\nDirectory listing grants no full-profile access and is separate from Nearby.", 12, -390, 460)
     Text(content, "Pending requests (expire after 25 seconds)", 12, -435)
     Text(content, "Explicit Connections approvals — these apply only to this character's profile", 12, -750)
     self:Refresh()
@@ -92,6 +94,9 @@ function Options:Refresh()
         end
     end
     local settings = Addon.Database:GetActivitySettings()
+    local labels = {visible = "Visible", restricted = "Friends/Guild Only", hidden = "Hidden"}
+    self.visibilityStatus:SetText("Discovery Visibility: " .. (labels[Addon.Database:GetPrivacyMode()] or "Unknown") .. " (change in Settings)")
+    self.networkStatus:SetText(Addon.Activity:GetNetworkingStatus())
     self.experimental:SetText(settings.enabled and "Experimental Network: ON" or "Experimental Network: OFF")
     self.markers:SetText(settings.markers and "Minimap Markers: ON" or "Minimap Markers: OFF")
     self.directory:SetText(settings.directory and "Directory Participation: ON" or "Directory Participation: OFF")

@@ -70,5 +70,5 @@ for _, retired in ipairs({"debug", "diag", "sim", "hello", "presence"}) do
     Check(lines[#lines]:find("/frp " .. retired, 1, true) ~= nil, true)
 end
 SlashCmdList.FOREVERRP("version")
-Check(lines[#lines - 2], "Build: forever-names-transport-20261010-9")
+Check(lines[#lines - 2], "Build: privacy-clarity-20261010-10")
 print(string.format("PASS: %d public command checks", checks))

@@ -4,7 +4,7 @@ ForeverRP provides roleplaying profiles, automatic discovery of consenting Forev
 
 ## Current version
 
-`0.1.1-beta.9` — build `forever-names-transport-20261010-9` (controlled multiplayer test build).
+`0.1.1-beta.10` — build `privacy-clarity-20261010-10` (controlled multiplayer test build).
 
 Beta.9 fixes the bundled Chomp login/Battle.net parser for Forever multiword names and its related MSP recipient corruption. It adds bounded debug-only tracing of actual whisper recipients. The yellow player-not-found error has a reproducible MSP corruption path, but actual delivery still needs retesting; no speculative discovery address rewrite is included. See [the Beta.9 retest guide](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/BETA9_TRANSPORT_RETEST.md), including shared-library load-order limitations and login/reload tests.
 
@@ -42,7 +42,9 @@ Automatic notifications retain the per-player cooldown (10 minutes by default). 
 
 Cross-layer delivery remains unverified. **Privacy** contains an experimental network toggle, off by default. When Visible and opted in, it joins `ForeverRPActivity` and sends compact addon metadata over available group/guild/shared-channel routes. This is a transport prototype, not a verified server-wide discovery service. Friends/Guild Only uses eligible social routes and does not join the shared channel. Hidden sends no activity advertisements. No messages are relayed.
 
-Choose **Location hidden** (default), **Zone only**, or **Precise location**. Optional **Subzone sharing** is off by default and requires zone or precise sharing. Optional minimap markers require valid precise coordinates received within 125 seconds, in your current zone and coordinate space. All markers are neutral and noninteractive; layer status is always **Unknown** because no reliable layer identifier is available. Markers do not request or open profiles and do not establish Nearby eligibility. Cross-layer markers, world-wide channel coverage, and map projection need live validation.
+The Privacy panel shows Discovery Visibility (changed in Settings) and whether the saved Experimental Network preference is paused. Hidden visibility or disabled discovery blocks directory networking. Directory Participation OFF stops listing your character while still allowing browsing; withholding location also allows browsing when networking is otherwise enabled.
+
+Choose **Don't share my location** (default), **Share zone only**, or **Share precise location**. Optional **Subzone sharing** is off by default and requires zone or precise sharing. Optional minimap markers require valid precise coordinates received within 125 seconds, in your current zone and coordinate space. All markers are neutral and noninteractive; layer status is always **Unknown** because no reliable layer identifier is available. Markers do not request or open profiles and do not establish Nearby eligibility. Cross-layer markers, world-wide channel coverage, and map projection need live validation.
 
 **RP Directory** reuses the experimental Activity panel and the existing Presence cache. **Directory participation** is an independent, explicit opt-in in Privacy; it does not enable networking, reveal your location, or grant full-profile access. Both clients must enable experimental networking to exchange directory metadata. Default listings include IC and LF RP users; OOC and AFK require the expanded filter, and DND is always excluded. Search and zone/status filters use cached data without sending requests. Region means continent when the client map hierarchy supplies it, otherwise Unknown. Select **Request Profile** explicitly to use the existing transfer/approval workflow. Character identities are displayed; RP display names and biographies are not broadcast in directory packets.
 

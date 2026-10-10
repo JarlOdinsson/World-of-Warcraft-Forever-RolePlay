@@ -54,6 +54,31 @@ function Activity:Enabled()
         and Addon.Database:GetPrivacyMode() ~= "hidden"
 end
 
+-- Explanations only: keep the existing networking/privacy gates above unchanged.
+function Activity:GetNetworkingBlockers()
+    local blockers = {}
+    if not Addon.Database:IsDiscoveryEnabled() then
+        blockers[#blockers + 1] = "Discovery disabled: enable discovery in Settings."
+    end
+    if Addon.Database:GetPrivacyMode() == "hidden" then
+        blockers[#blockers + 1] = "Hidden visibility blocks networking: Settings > Discovery Visibility."
+    end
+    if not Addon.Database:GetActivitySettings().enabled then
+        blockers[#blockers + 1] = "Experimental Network OFF: enable in Privacy > Experimental Network."
+    end
+    return blockers
+end
+
+function Activity:GetNetworkingStatus()
+    local settings = Addon.Database:GetActivitySettings()
+    local paused = {}
+    if not Addon.Database:IsDiscoveryEnabled() then paused[#paused + 1] = "discovery disabled" end
+    if Addon.Database:GetPrivacyMode() == "hidden" then paused[#paused + 1] = "Hidden visibility" end
+    if not settings.enabled then return "Saved preference: OFF. Networking disabled." end
+    if #paused > 0 then return "Saved preference: ON - paused by " .. table.concat(paused, " and ") .. "." end
+    return "Settings permit networking; connection and delivery are not confirmed."
+end
+
 function Activity:TakeBudget()
     local now = Now()
     self.tokens = math.min(3, (self.tokens or 3) + math.max(0, now - (self.tokenAt or now)))

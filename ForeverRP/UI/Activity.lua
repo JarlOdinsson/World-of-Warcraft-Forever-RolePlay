@@ -79,9 +79,10 @@ end
 function UI:Refresh()
     if not self.panel or not self.panel:IsShown() or not self.content then return end
     for _, row in ipairs(self.rows) do row:Hide() end
-    self.status:SetText(Addon.Activity:Enabled()
+    local blockers = Addon.Activity:GetNetworkingBlockers()
+    self.status:SetText(#blockers == 0
         and "Opt-in users, current zone first. Layer: Unknown. Region means continent.\nFilters use cached data only. Directory membership grants no profile access."
-        or "Experimental networking is off or unavailable. Enable it in Privacy.\nParticipation, location sharing and full-profile disclosure are separate choices.")
+        or table.concat(blockers, "\n"))
     local entries = Addon.Activity:Enabled() and Addon.Activity:QueryDirectory(self.filters) or {}
     for index, entry in ipairs(entries) do
         local row = self.rows[index] or self:CreateRow(index)

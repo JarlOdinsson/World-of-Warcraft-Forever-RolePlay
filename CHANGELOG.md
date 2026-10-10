@@ -2,6 +2,13 @@
 
 All notable user-facing changes to ForeverRP will be documented here.
 
+## 0.1.1-beta.10 — privacy-clarity-20261010-10 (controlled test build)
+
+- Directory lists each settings blocker: discovery disabled, Hidden visibility, Experimental Network OFF.
+- Privacy shows read-only Discovery Visibility and explains saved network preference versus settings eligibility, without implying connection or delivery.
+- Clarified location sharing and Directory Participation: withholding location or opting out of listing does not disable browsing.
+- Status text refreshes immediately after relevant settings changes; privacy gates, defaults and saved keys are unchanged.
+
 ## 0.1.1-beta.9 — forever-names-transport-20261010-9 (controlled test build)
 
 - Fixed bundled Chomp login/Battle.net name merging on Forever Interface 16001: the client display format no longer makes spaces inside a character name look like realm separators. Separate realms and distinct ClassicBetaPvE/ClassicBetaPvE2 keys are preserved.

@@ -27,6 +27,7 @@ lua tests/public_commands.lua
 lua tests/enhanced_discovery.lua
 lua tests/directory.lua
 lua tests/forever_transport.lua
+lua tests/privacy_ux.lua
 ```
 
 LuaJIT can replace `lua` in these commands. The Connections suite uses mock
@@ -102,3 +103,8 @@ Test-only client stubs do not establish real login, delivery or recipient syntax
 Beta.9 issue-specific live tests: [BETA9_TRANSPORT_RETEST.md](../docs/BETA9_TRANSPORT_RETEST.md).
 Directory live test instructions: [DIRECTORY_GUILD_TESTING.md](../docs/DIRECTORY_GUILD_TESTING.md).
 The beta.7 checklist/report are historical and superseded by beta.8.
+
+The privacy UX suite checks all blocker combinations, saved versus effective network
+status, independent location/listing consent, real setter refreshes, panel switching
+and SavedVariables reinitialization. Widget width/line estimates are mocked; they
+do not verify client font rendering, UI scaling or live /reload behavior.

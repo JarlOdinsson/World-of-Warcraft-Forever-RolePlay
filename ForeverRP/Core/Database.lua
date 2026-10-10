@@ -261,6 +261,11 @@ function Addon.Database:IsDiscoveryEnabled()
     return self.account.settings.discovery.enabled == true
 end
 
+local function RefreshDiscoveryStatuses()
+    if Addon.DiscoveryOptions then Addon.DiscoveryOptions:Refresh() end
+    if Addon.ActivityUI then Addon.ActivityUI:Refresh() end
+end
+
 function Addon.Database:SetDiscoveryEnabled(enabled)
     if Addon.Activity then Addon.Activity:Withdraw() end
     self.account.settings.discovery.enabled = enabled == true
@@ -268,6 +273,7 @@ function Addon.Database:SetDiscoveryEnabled(enabled)
     if Addon.NearbyPlayers then
         Addon.NearbyPlayers:ReevaluateAll()
     end
+    RefreshDiscoveryStatuses()
 end
 
 function Addon.Database:GetDiscoveryRadius()
@@ -318,6 +324,7 @@ function Addon.Database:SetPrivacyMode(mode, suppressBroadcast)
             if Addon.Communication and allowed ~= "hidden" and not suppressBroadcast then
                 Addon.Communication:SendHello()
             end
+            RefreshDiscoveryStatuses()
             return true
         end
     end
@@ -391,11 +398,13 @@ function Addon.Database:SetActivitySetting(key, value)
             Addon.Activity:Changed()
             if value == false then Addon.Activity:Withdraw() end
         end
+        RefreshDiscoveryStatuses()
         return true
     end
     if Addon.Activity then Addon.Activity:Withdraw() end
     self.account.settings.activity[key] = value
     if Addon.Activity then Addon.Activity:Reset() end
+    RefreshDiscoveryStatuses()
     return true
 end
 

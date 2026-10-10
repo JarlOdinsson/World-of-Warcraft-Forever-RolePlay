@@ -29,6 +29,7 @@ local function Fixture()
         function frame:SetScript(event, handler) self.scripts[event] = handler end
         return frame
     end
+    InCombatLockdown = function() return false end
     GetTime = function() return 100 end
     GetNormalizedRealmName = function() return "Realm" end
     IsInRaid = function() return false end

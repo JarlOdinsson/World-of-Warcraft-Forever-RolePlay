@@ -9,6 +9,7 @@ All notable user-facing changes to ForeverRP will be documented here.
 - Expand `/frp network` with rate-limited membership, prefix, route, enqueue-result and valid remote-receipt evidence, without profile contents or notes.
 - Test Directory discovery without mouseover, visible units or prior Nearby. Actual shared-channel/cross-layer delivery remains unverified; layer stays Unknown.
 - Preserve opt-ins, privacy, existing A1/A2 packets and physical Nearby requirements.
+- Post-build repair: prevent CheckInteractDistance calls during combat lockdown or without accessible out-of-combat evidence. Unavailable range remains Unknown; Directory and Nearby admission rules are preserved. Local live retesting reported no Lua error; broader combat validation remains pending.
 
 ## 0.1.1-beta.10 — privacy-clarity-20261010-10 (controlled test build)
 

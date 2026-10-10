@@ -119,6 +119,7 @@ Test("real observation, ACK, presence, and profile sends retain exact separate r
             return name:match("^(%S+) (.+)$")
         end
         GetUnitName = function(unit) return unit == "player" and "Local-" .. f.realm or name end
+        InCombatLockdown = function() return false end
         CheckInteractDistance = function() return true end
         Check(ForeverRP.PlayerDetection:DetectUnit("mouseover", "mouseover"), true)
         Check(f.sent[1].payload:match("^HELLO|") ~= nil, true)

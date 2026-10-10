@@ -9,6 +9,7 @@ local function Fixture()
         enabled = true, result = 0, alerts = 0, refreshes = 0, range = true, trusted = false, lines = {},
         sounds = {}, entries = 0}
     ForeverRP = {}
+    InCombatLockdown = function() return false end
     GetTime = function() return f.now end
     SOUNDKIT = {READY_CHECK = 8960}
     PlaySound = function(kit, channel)

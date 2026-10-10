@@ -29,6 +29,7 @@ lua tests/directory.lua
 lua tests/forever_transport.lua
 lua tests/privacy_ux.lua
 lua tests/directory_transport.lua
+lua tests/range_restrictions.lua
 ```
 
 LuaJIT can replace `lua` in these commands. The Connections suite uses mock
@@ -117,3 +118,9 @@ clients through the real metadata parser, presence and Directory query, with no
 shared party/guild or remote unit. That bridge deliberately delivers packets:
 it proves no dependency on mouseover or Nearby, not cross-layer server delivery.
 The rate-limited /frp network report distinguishes enqueue from remote receipt.
+
+The restricted-range suite asserts zero CheckInteractDistance invocations in
+combat or with unknown/inaccessible lockdown evidence. It exercises the actual
+mouseover observation path and recovery through the existing Nearby ticker.
+Directory metadata remains independent of range. Mock blocked-event counters
+are not the client taint engine; see docs/RANGE_BLOCKED_RETEST.md for live steps.

@@ -2,6 +2,7 @@ local function Fixture()
     local f = {now = 100, sent = {}, timers = {}, zone = 10, x = 100, y = 200, space = 1,
         lines = {}, result = 0, joined = 0, secret = {}, name = "Local", realm = "Realm"}
     ForeverRP, ForeverRPDB, ForeverRPCharacterDB = {State = {}}, nil, nil
+    InCombatLockdown = function() return false end
     GetTime = function() return f.now end
     time = function() return 1800000000 end
     canaccessallvalues = function(...)

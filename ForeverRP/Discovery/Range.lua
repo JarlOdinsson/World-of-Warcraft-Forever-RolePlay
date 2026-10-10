@@ -27,6 +27,13 @@ local function InteractionCheck(unit, index)
     if not ValueAccess:IsString(unit) or not CheckInteractDistance then
         return nil
     end
+    -- Do not invoke the protected API in combat: catching its Lua error would
+    -- still emit ADDON_ACTION_BLOCKED. Require accessible out-of-combat evidence
+    -- before every call, including subsequent brackets in the same evaluation.
+    -- No hostile-unit exception is assumed for the Forever client.
+    if not InCombatLockdown then return nil end
+    local lockdown = InCombatLockdown()
+    if not ValueAccess:CanAccess(lockdown) or lockdown ~= false then return nil end
     local result = CheckInteractDistance(unit, index)
     if not ValueAccess:CanAccess(result) then return nil end
     if result == true or result == 1 then return true end

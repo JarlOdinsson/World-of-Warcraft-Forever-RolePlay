@@ -10,6 +10,7 @@ end
 local function Fixture()
     local f = {now = 100, lines = {}, privacy = "visible", enabled = true, sendResult = 0, sent = 0}
     ForeverRP = {}
+    InCombatLockdown = function() return false end
     GetTime = function() return f.now end
     GetRealmName = function() return "Realm" end
     GetNormalizedRealmName = GetRealmName

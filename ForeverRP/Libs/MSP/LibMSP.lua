@@ -62,7 +62,12 @@ local INTERNAL_FIELDS = {
 	VP = true, GC = true, GF = true, GR = true, GS = true, GU = true,
 }
 
-local PLAYER_NAME = AddOn_Chomp.NameMergedRealm(UnitFullName("player"))
+local function UnitNameMergedRealm(unit)
+	if AddOn_Chomp.Internal and AddOn_Chomp.Internal.ForeverNameCompatibility and AddOn_Chomp.NameFromUnit then return AddOn_Chomp.NameFromUnit(unit) end
+	return AddOn_Chomp.NameMergedRealm(UnitFullName(unit))
+end
+local PLAYER_NAME = UnitNameMergedRealm("player")
+if not PLAYER_NAME then return end -- unavailable identity must not become a cache key
 
 local PROCESS = ("([^%s]+)%s"):format(SEPARATOR, SEPARATOR)
 local PROCESS_COMPLETE = PROCESS .. "?"
@@ -599,9 +604,9 @@ local function EventFrame_Handler(self, event, ...)
 			local unit = unitFormat:format(i)
 			local relationship = UnitRealmRelationship(unit)
 			if relationship == LE_REALM_RELATION_COALESCED then
-				local name = AddOn_Chomp.NameMergedRealm(UnitFullName(unit))
-				local charTable = msp.char[name]
-				if not charTable.seenInGroup then
+				local name = UnitNameMergedRealm(unit)
+				local charTable = name and msp.char[name]
+				if charTable and not charTable.seenInGroup then
 					charTable.seenInGroup = true
 					charTable.scantime = nil
 					charTable.supported = nil

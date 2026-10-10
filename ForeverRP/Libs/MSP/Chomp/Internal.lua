@@ -14,7 +14,11 @@
 	CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ]]
 
-local VERSION = 24
+-- Local compatibility revision of v24, selected only on the supported Forever
+-- client. Normal LibStub negotiation preserves a newer shared implementation.
+local _, _, _, clientInterface = GetBuildInfo()
+local isForever = clientInterface == 16001
+local VERSION = isForever and 25 or 24
 
 if IsLoggedIn() then
 	error(("Chomp Message Library (embedded: %s) cannot be loaded after login."):format((...)))
@@ -31,6 +35,7 @@ Chomp.Internal = Chomp.Internal or __chomp_internal or CreateFrame("Frame")
 Chomp.Internal.LOADING = true
 
 local Internal = Chomp.Internal
+Internal.ForeverNameCompatibility = isForever
 
 Internal.callbacks = LibStub:GetLibrary("CallbackHandler-1.0"):New(Internal)
 
@@ -173,7 +178,7 @@ local function HandleMessageIn(prefix, text, channel, sender, target, zoneChanne
 		end
 		if msgID == 1 then
 			local broadcastTarget, broadcastText = text:match("^([^\058\127]*)[\058\127](.*)$")
-			local ourName = Chomp.NameMergedRealm(UnitFullName("player"))
+			local ourName = Chomp.NameFromUnit("player")
 			if sender == ourName or broadcastTarget ~= "" and broadcastTarget ~= ourName then
 				-- Not for us, quit processing.
 				return
@@ -267,7 +272,8 @@ local function ParseBattleNetMessage(prefix, text, kind, bnetIDGameAccount)
 		return
 	end
 
-	return prefix, text, ("%s:BATTLENET"):format(kind), name, Chomp.NameMergedRealm(UnitName("player")), 0, 0, "", 0
+	local localName = isForever and Chomp.NameFromUnit("player") or Chomp.NameMergedRealm(UnitName("player"))
+	return prefix, text, ("%s:BATTLENET"):format(kind), name, localName, 0, 0, "", 0
 end
 
 function Internal:GetCodecVersionFromBitfield(bitField)
@@ -445,7 +451,7 @@ local function MessageEventFilter_SYSTEM (self, event, text, ...)
 end
 
 local function HookSendAddonMessage(prefix, text, kind, target)
-	if kind == "WHISPER" and target then
+	if not isForever and kind == "WHISPER" and target then
 		local filterKey = Internal.MessageFilterKeyCache[target]
 		Internal.Filter[filterKey] = GetTime() + (select(3, GetNetStats()) * 0.001) + 5.000
 	end
@@ -456,7 +462,7 @@ local function HookSendAddonMessage(prefix, text, kind, target)
 end
 
 local function HookSendAddonMessageLogged(prefix, text, kind, target)
-	if kind == "WHISPER" and target then
+	if not isForever and kind == "WHISPER" and target then
 		local filterKey = Internal.MessageFilterKeyCache[target]
 		Internal.Filter[filterKey] = GetTime() + (select(3, GetNetStats()) * 0.001) + 5.000
 	end
@@ -684,7 +690,8 @@ Internal:SetScript("OnEvent", function(self, event, ...)
 		hooksecurefunc("BNSendWhisper", HookBNSendWhisper)
 		hooksecurefunc(C_Club, "SendMessage", HookC_ClubSendMessage)
 		hooksecurefunc(C_Club, "EditMessage", HookC_ClubEditMessage)
-		ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", MessageEventFilter_SYSTEM)
+		-- Keep Forever's player-not-found evidence visible; do not mask delivery errors.
+		if not isForever then ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", MessageEventFilter_SYSTEM) end
 		self.SameRealm = {}
 		self.SameRealm[(GetRealmName():gsub("[%s%-]", ""))] = true
 		for i, realm in ipairs(GetAutoCompleteRealms()) do

@@ -96,8 +96,11 @@ local CodecsByVersion = {
 
 -- Realm part matching is greedy, as realm names will rarely have dashes, but
 -- player names will never.
-local FULL_PLAYER_SPLIT = FULL_PLAYER_NAME:gsub("-", "%%%%-"):format("^(.-)", "(.+)$")
-local FULL_PLAYER_FIND = FULL_PLAYER_NAME:gsub("-", "%%%%-"):format("^.-", ".+$")
+-- Forever's FULL_PLAYER_NAME is a display format ("%s %s"), not a transport
+-- identity delimiter. Keep this library-local; never replace the client global.
+local playerNameFormat = Internal.ForeverNameCompatibility and "%s-%s" or FULL_PLAYER_NAME
+local FULL_PLAYER_SPLIT = playerNameFormat:gsub("-", "%%%%-"):format("^(.-)", "(.+)$")
+local FULL_PLAYER_FIND = playerNameFormat:gsub("-", "%%%%-"):format("^.-", ".+$")
 
 function Chomp.NameMergedRealm(name, realm)
 	if type(name) ~= "string" then
@@ -116,13 +119,36 @@ function Chomp.NameMergedRealm(name, realm)
 			realm = GetRealmName()
 		end
 	elseif name:find(FULL_PLAYER_FIND) then
-		error("Chomp.NameMergedRealm: name already has a realm name, but realm name also provided")
+		local splitName, splitRealm = name:match(FULL_PLAYER_SPLIT)
+		if Internal.ForeverNameCompatibility and splitRealm:gsub("[%s%-]", "") == realm:gsub("[%s%-]", "") then
+			name = splitName -- identical explicit realm is safe and idempotent
+		else
+			error("Chomp.NameMergedRealm: name already has a realm name, but realm name also provided")
+		end
 	end
-	return FULL_PLAYER_NAME:format(name, (realm:gsub("[%s%-]", "")))
+	return playerNameFormat:format(name, (realm:gsub("[%s%-]", "")))
 end
 
 function Chomp.NameSplitRealm(nameRealm)
 	return string.match(nameRealm, FULL_PLAYER_SPLIT)
+end
+
+-- UnitFullName can split a Forever character's surname into the second return.
+-- GetUnitName supplies the independent evidence; explicit realms stay distinct.
+function Chomp.NameFromUnit(unit)
+	if not Internal.ForeverNameCompatibility then
+		return Chomp.NameMergedRealm(UnitFullName(unit))
+	end
+	local name, second = UnitFullName(unit)
+	local combined = GetUnitName and GetUnitName(unit, true)
+	if canaccessallvalues and canaccessallvalues(name, second, combined) ~= true then return nil end
+	if type(name) ~= "string" or (second ~= nil and type(second) ~= "string") then return nil end
+	if type(combined) == "string" and combined ~= "" then
+		if combined:find("-", 1, true) then return Chomp.NameMergedRealm(combined) end
+		if second and combined == name .. " " .. second then return Chomp.NameMergedRealm(combined) end
+		if combined ~= name then return nil end
+	end
+	return Chomp.NameMergedRealm(name, second)
 end
 
 local Serialize = setmetatable({}, {

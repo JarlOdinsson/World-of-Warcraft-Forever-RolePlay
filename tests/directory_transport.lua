@@ -54,14 +54,15 @@ end)
 Test("route changes retain thirty-second floor and never starve shared channel", function(f)
     Enable(); local a = ForeverRP.Activity
     IsInGroup, IsInGuild = function() return true end, function() return true end
-    a:Tick(); Check(#a.queue, 2)
-    f.now = 101; a:Tick(); f.now = 102; a:Tick()
-    Check(#f.sent, 3)
-    Check(f.sent[1].channel, "PARTY"); Check(f.sent[2].channel, "GUILD"); Check(f.sent[3].channel, "CHANNEL")
+    a:Tick(); Check(#a.queue, 3)
+    for second = 101, 105 do f.now = second; a:Tick() end
+    Check(#f.sent, 6)
+    Check(f.sent[1].channel, "PARTY"); Check(f.sent[3].channel, "GUILD"); Check(f.sent[5].channel, "CHANNEL")
     IsInGroup = function() return false end
-    f.now = 103; a:Tick(); Check(#f.sent, 3)
-    f.now = 130; a:Tick(); f.now = 131; a:Tick(); Check(#f.sent, 5)
-    Check(f.sent[4].channel, "GUILD"); Check(f.sent[5].channel, "CHANNEL")
+    f.now = 106; a:Tick(); Check(#f.sent, 6)
+    for second = 130, 133 do f.now = second; a:Tick() end
+    Check(#f.sent, 10)
+    Check(f.sent[7].channel, "GUILD"); Check(f.sent[9].channel, "CHANNEL")
 end)
 Test("API rejection and throttling stay bounded and never assert delivery", function(f)
     Enable(); local a = ForeverRP.Activity
@@ -209,7 +210,7 @@ Test("two isolated mocked clients exchange real metadata without shared social o
         Check(a.Activity:GetPeer(remoteClient.sender).layer, "UNKNOWN")
         Check(a.Activity:GetPeer(remoteClient.sender).zone, 0)
         Check(a.NearbyPlayers:GetCount(false), 0)
-        Check(#localClient.f.sent <= 5, true)
+        Check(#localClient.f.sent <= 10, true) -- ordered snapshots plus legacy copies
     end
     Activate(one); one.a.Database:SetActivitySetting("directory", false)
     one.f.now, two.f.now = 401, 401; Exchange(one, two)

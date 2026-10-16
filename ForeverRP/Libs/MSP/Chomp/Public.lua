@@ -444,6 +444,36 @@ local function SplitAndSend(sendFunc, maxSize, bitField, prefix, text, ...)
 	end
 end
 
+-- Forever-only opt-in path for short, independently observed MSP requests.
+-- Preserve the actual client transport recipient, and validate again at the
+-- final throttled send boundary. Default/shared library callers are unchanged.
+if Internal.ForeverNameCompatibility then
+    function Chomp.SendObservedMSPRequest(payload, recipient, validate, report)
+        if not Internal.isReady or not Internal.Prefixes.MSP2
+            or type(payload) ~= "string" or #payload > 243
+            or type(recipient) ~= "string" or type(validate) ~= "function"
+            or not validate() or (Internal.observedPending or 0) >= 32 then return false end
+        Internal.observedPending = (Internal.observedPending or 0) + 1
+        local expires = GetTime() + 5
+        SplitAndSend(function(prefix, text)
+            local message = {prefix, text, "WHISPER", recipient,
+                kind = "WHISPER", length = #prefix + #text + OVERHEAD}
+            message.f = function(p, body, channel, target)
+                Internal.observedPending = Internal.observedPending - 1
+                if GetTime() >= expires or not validate() then
+                    if report then report(nil, "stale-observation") end
+                    return false
+                end
+                local result = C_ChatInfo.SendAddonMessage(p, body, channel, target)
+                if report then report(result, "sent") end
+                return result == true or result == 0
+            end
+            Internal:Enqueue("LOW", "ForeverRP-observed-MSP:" .. recipient, message)
+        end, 255, bit.bor(Internal.BITS.VERSION16, Internal.BITS.CODECV2), "MSP2", payload)
+        return true
+    end
+end
+
 local function ToInGame(bitField, prefix, text, kind, target, priority, queue)
 	return SplitAndSend(Chomp.SendAddonMessage, 255, bitField, prefix, text, kind, target, priority, queue)
 end

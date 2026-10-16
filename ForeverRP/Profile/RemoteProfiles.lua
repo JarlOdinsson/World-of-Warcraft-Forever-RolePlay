@@ -4,6 +4,19 @@ Addon.RemoteProfiles = {
     profiles = {},
 }
 
+-- Packet senders and observed units may differ in case. Transfer IDs already
+-- compare the full canonical identity this way; cache lookup must agree.
+-- Preserve the complete name and realm, never a transport recipient or alias.
+local function StoredKey(profiles, characterKey)
+    if type(characterKey) ~= "string" then return nil end
+    if profiles[characterKey] then return characterKey end
+    local target = string.lower(characterKey)
+    for key in pairs(profiles) do
+        if string.lower(key) == target then return key end
+    end
+    return characterKey
+end
+
 local function CopyProfile(profile)
     local copy = {}
     for _, field in ipairs(Addon.Constants.PROFILE_FIELD_ORDER) do
@@ -32,6 +45,7 @@ function Addon.RemoteProfiles:StoreProfile(characterKey, profile, metadata)
     if type(characterKey) ~= "string" or Addon.Presence:IsSelf(characterKey) then
         return false, "invalid remote identity"
     end
+    characterKey = StoredKey(self.profiles, characterKey)
     local sanitized, reason = Addon.Profile:SanitizeRemoteProfile(profile)
     if not sanitized then
         return false, reason
@@ -68,6 +82,8 @@ function Addon.RemoteProfiles:HasProfile(characterKey, includeSimulated)
 end
 
 function Addon.RemoteProfiles:GetProfile(characterKey, includeSimulated)
+    characterKey = StoredKey(self.profiles, characterKey)
+    if not characterKey then return nil end
     local entry = self.profiles[characterKey]
     if entry and entry.expiresAt and entry.expiresAt <= (GetTime and GetTime() or 0) then
         self:ClearProfile(characterKey)
@@ -103,6 +119,8 @@ function Addon.RemoteProfiles:Expire()
 end
 
 function Addon.RemoteProfiles:ClearProfile(characterKey)
+    characterKey = StoredKey(self.profiles, characterKey)
+    if not characterKey then return end
     self.profiles[characterKey] = nil
     if Addon.ProfileViewer then Addon.ProfileViewer:RefreshIfViewing(characterKey) end
     if Addon.NearbyUI then

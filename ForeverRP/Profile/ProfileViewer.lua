@@ -126,10 +126,15 @@ function Viewer:Refresh()
     local profile = Addon.Profile:Get()
     if self.remoteCharacterKey then
         local entry = Addon.RemoteProfiles:GetProfile(self.remoteCharacterKey, self.includeSimulated == true)
-        if not entry and Addon.MSPCompatibility then
+        if not entry and not self.includeSimulated and Addon.MSPCompatibility then
             entry = Addon.MSPCompatibility:GetProfile(self.remoteCharacterKey)
         end
         if entry then
+            self.remoteCharacterKey = entry.characterKey
+            self.remoteSource = entry.source or "ForeverRP"
+            if Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordProfile then
+                Addon.DiscoveryDiagnostics:RecordProfile("viewer", entry.characterKey, self.requestId, self.remoteSource)
+            end
             profile = entry.profile
             self.title:SetText(profile.rpName ~= "" and Addon:EscapePlainText(profile.rpName)
                 or Addon:GetText("PROFILE_VIEWER_TITLE"))
@@ -141,6 +146,7 @@ function Viewer:Refresh()
         end
     end
     if not self.remoteCharacterKey then
+        self.remoteSource = nil
         self.title:SetText(Addon:GetText("PROFILE_VIEWER_TITLE"))
         self.contextLabel:SetText(Addon:GetText("PROFILE_VIEWER_LOCAL"))
     end
@@ -165,8 +171,7 @@ function Viewer:RefreshConnectionActions()
     if not self.rememberButton then
         return
     end
-    local external = self.remoteCharacterKey and Addon.MSPCompatibility
-        and Addon.MSPCompatibility:HasProfile(self.remoteCharacterKey)
+    local external = self.remoteSource == "MSP"
     local visible = self.remoteCharacterKey ~= nil and not external and Addon.Database:GetPrivacyMode() ~= "hidden"
     self.rememberButton:SetShown(visible)
     self.favoriteButton:SetShown(visible)
@@ -184,16 +189,21 @@ function Viewer:RefreshConnectionActions()
 end
 
 function Viewer:ShowLocal()
+    self.requestId = nil
     self.remoteCharacterKey = nil
     self.includeSimulated = false
     self:Refresh()
 end
 
-function Viewer:ShowRemote(characterKey, includeSimulated)
+function Viewer:ShowRemote(characterKey, includeSimulated, requestId)
     if not Addon.RemoteProfiles:HasProfile(characterKey, includeSimulated) then
+        if Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordProfile then
+            Addon.DiscoveryDiagnostics:RecordProfile("viewer-reject", characterKey, requestId, "FRP-cache-missing-or-private")
+        end
         return false
     end
     self.remoteCharacterKey = characterKey
+    self.requestId = requestId
     self.includeSimulated = includeSimulated == true
     Addon.UI:Show("viewer")
     self:Refresh()
@@ -201,9 +211,14 @@ function Viewer:ShowRemote(characterKey, includeSimulated)
 end
 
 function Viewer:ShowMSP(characterKey)
+    -- Even an explicit external-profile open must prefer a received FRP profile.
+    if Addon.RemoteProfiles:HasProfile(characterKey, false) then
+        return self:ShowRemote(characterKey, false)
+    end
     if not Addon.MSPCompatibility or not Addon.MSPCompatibility:HasProfile(characterKey) then
         return false
     end
+    self.requestId = nil
     self.remoteCharacterKey = characterKey
     self.includeSimulated = false
     Addon.UI:Show("viewer")

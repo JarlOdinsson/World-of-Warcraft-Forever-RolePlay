@@ -1,3 +1,5 @@
+-- Historical experimental suites explicitly load the archived Beta 17 modules.
+-- Current Phase 1 isolation is tested with helpers/phase1_fixture.lua instead.
 local function Fixture()
     local f = {now = 100, sent = {}, timers = {}, zone = 10, x = 100, y = 200, space = 1,
         lines = {}, result = 0, joined = 0, secret = {}, name = "Local", realm = "Realm"}
@@ -50,8 +52,8 @@ local function Fixture()
     dofile("ForeverRP/Discovery/ProfileTransfer.lua")
     dofile("ForeverRP/Modules/Connections.lua")
     dofile("ForeverRP/Discovery/ProfileAuthorization.lua")
-    dofile("ForeverRP/Discovery/Activity.lua")
-    dofile("ForeverRP/UI/PlayerMarkers.lua")
+    dofile("experiments/beta17/Discovery/Activity.lua")
+    dofile("experiments/beta17/UI/PlayerMarkers.lua")
     ForeverRP.Communication:Initialize()
     function f:Peer(peer)
         ForeverRP.Presence:Update(peer or "Peer-Realm", {addonVersion = "0.1.1-beta.7", protocolVersion = 1})

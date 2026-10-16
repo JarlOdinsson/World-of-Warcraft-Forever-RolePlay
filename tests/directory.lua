@@ -212,7 +212,7 @@ end)
 
 Test("directory UI search is local and its explicit action uses the existing transfer", function(f)
     local Widget = {}; Widget.__index = Widget
-    for _, method in ipairs({"SetPoint", "SetWidth", "SetJustifyH", "SetSize", "SetAllPoints", "SetScrollChild", "SetHeight", "SetAutoFocus", "SetMaxLetters", "ClearFocus"}) do Widget[method] = function() end end
+    for _, method in ipairs({"SetPoint", "SetWidth", "SetJustifyH", "SetSize", "SetAllPoints", "SetScrollChild", "SetHeight", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "RegisterEvent"}) do Widget[method] = function() end end
     function Widget:CreateFontString() return setmetatable({}, Widget) end
     function Widget:SetText(text) self.text = text end
     function Widget:GetText() return self.text or "" end
@@ -320,7 +320,7 @@ Test("combined lifecycle preserves Forever names, range entry, and directory iso
     local sent = #f.sent
     f.dnd = true; f.now = f.now + 1; ticks[1]()
     Check(f.sent[#f.sent].payload, "OFF")
-    f.now = f.now + 1; ticks[1](); Check(#f.sent, sent + 1)
+    f.now = f.now + 1; ticks[1](); Check(#f.sent, sent + 2) -- ordered and legacy withdrawals
 end)
 
 print(string.format("PASS: %d directory/audit regression cases; %d checks (mocks only)", cases, checks))

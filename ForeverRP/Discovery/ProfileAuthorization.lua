@@ -33,23 +33,31 @@ function Auth:Status(peer, id, status)
 end
 
 function Auth:HandleRequest(packet, sender, peer)
+    local function Trace(reason)
+        if Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordProfile then
+            Addon.DiscoveryDiagnostics:RecordProfile("authorization", peer, packet.messageId,
+                reason .. ":" .. Addon.Database:GetDisclosureMode(), sender)
+        end
+    end
     self:Tick()
     local key, now = Key(peer), Now()
-    if self.seen[key] and now - self.seen[key] < 10 then self.denied = self.denied + 1; return false, "cooldown" end
-    if not self.seen[key] and Count(self.seen) >= 100 then self.denied = self.denied + 1; return false, "busy" end
+    if self.seen[key] and now - self.seen[key] < 10 then Trace("cooldown"); self.denied = self.denied + 1; return false, "cooldown" end
+    if not self.seen[key] and Count(self.seen) >= 100 then Trace("busy"); self.denied = self.denied + 1; return false, "busy" end
     if not self.requestWindow or now - self.requestWindow >= 60 then
         self.requestWindow, self.requestCount = now, 0
     end
-    if self.requestCount >= 20 then self.denied = self.denied + 1; return false, "busy" end
+    if self.requestCount >= 20 then Trace("busy"); self.denied = self.denied + 1; return false, "busy" end
     self.requestCount, self.seen[key] = self.requestCount + 1, now
     if self:CanSend(peer, packet.messageId) then
+        Trace("allowed")
         local accepted, reason = Addon.ProfileTransfer:SendProfile(peer, packet.messageId, sender)
         if not accepted then self.denied = self.denied + 1 end
         if not accepted and reason == "busy" then self:Status(peer, packet.messageId, "busy") end
         return accepted, reason
     end
     if Addon.Database:GetDisclosureMode() == "approval" and Count(self.pending) < 8 then
-        if self.pending[key] then self.denied = self.denied + 1; return false, "pending" end
+        if self.pending[key] then Trace("already-pending"); self.denied = self.denied + 1; return false, "pending" end
+        Trace("awaiting-approval")
         self.pending[key] = {peer = peer, sender = sender, id = packet.messageId, untilAt = now + 25}
         self:Status(peer, packet.messageId, "pending")
         if not self.lastNotice or now - self.lastNotice >= 10 then
@@ -60,6 +68,7 @@ function Auth:HandleRequest(packet, sender, peer)
         return true, "approval"
     end
     self.denied = self.denied + 1
+    Trace("denied")
     self:Status(peer, packet.messageId, "denied")
     return false, "denied"
 end

@@ -62,7 +62,7 @@ end)
 
 Addon.Events:RegisterOptional("NAME_PLATE_UNIT_ADDED", function(unit)
     if Addon.ValueAccess:IsString(unit) then
-        Addon.PlayerDetection:DetectUnit(unit, "nameplate")
+        Addon.PlayerDetection:DetectUnit(unit, "nameplate", "NAME_PLATE_UNIT_ADDED")
     end
 end)
 
@@ -73,11 +73,11 @@ Addon.Events:RegisterOptional("NAME_PLATE_UNIT_REMOVED", function(unit)
 end)
 
 Addon.Events:RegisterOptional("PLAYER_TARGET_CHANGED", function()
-    Addon.PlayerDetection:RefreshUnit("target", "target")
+    Addon.PlayerDetection:RefreshUnit("target", "target", "PLAYER_TARGET_CHANGED")
 end)
 
 Addon.Events:RegisterOptional("UPDATE_MOUSEOVER_UNIT", function()
-    Addon.PlayerDetection:RefreshUnit("mouseover", "mouseover")
+    Addon.PlayerDetection:RefreshUnit("mouseover", "mouseover", "UPDATE_MOUSEOVER_UNIT")
 end)
 
 Addon.Events:RegisterOptional("PLAYER_FOCUS_CHANGED", function()
@@ -105,13 +105,13 @@ end)
 
 Addon.Events:RegisterOptional("PLAYER_ENTERING_WORLD", function()
     Addon.Communication:OnBroadcastContextChanged()
-    if Addon.Activity then Addon.Activity:OnWorldChanged() end
-end)
-
-Addon.Events:RegisterOptional("ZONE_CHANGED_NEW_AREA", function()
-    if Addon.Activity then Addon.Activity:Changed() end
+    if Addon.PlayerMarkers then Addon.PlayerMarkers:Clear() end
 end)
 
 Addon.Events:RegisterOptional("MINIMAP_UPDATE_ZOOM", function()
     if Addon.PlayerMarkers then Addon.PlayerMarkers:Refresh() end
+end)
+
+Addon.Events:RegisterOptional("PLAYER_REGEN_ENABLED", function()
+    if Addon.ChatOutput then Addon.ChatOutput:OnCombatEnded() end
 end)

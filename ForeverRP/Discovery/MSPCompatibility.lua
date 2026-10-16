@@ -9,12 +9,47 @@ local MSP = {
 }
 Addon.MSPCompatibility = MSP
 
+-- Temporary requester-side diagnostic switch. Default remains enabled. The
+-- optional flag survives /reload so each A/B pass can start with empty caches.
+function MSP:IsEnabled()
+    local account = Addon.Database and Addon.Database.GetAccount and Addon.Database:GetAccount()
+    return not account or account.diagnosticMSPDisabled ~= true
+end
+
+function MSP:SetEnabled(enabled)
+    local account = Addon.Database:GetAccount()
+    account.diagnosticMSPDisabled = enabled == false and true or nil
+    self.profiles, self.requests = {}, {}
+    if Addon.ProfileViewer then Addon.ProfileViewer:Refresh() end
+end
+
 local function Now()
     return GetTime and GetTime() or 0
 end
 
 local function Key(characterKey)
     return type(characterKey) == "string" and string.lower(characterKey) or nil
+end
+
+local function StoredKey(profiles, characterKey)
+    local target = Key(characterKey)
+    if not target then return nil end
+    if profiles[characterKey] then return characterKey end
+    for key in pairs(profiles) do
+        if Key(key) == target then return key end
+    end
+    return characterKey
+end
+
+local function HasContent(profile)
+    -- The importer supplies OOC as a default; protocol metadata/default status
+    -- alone is not an external roleplay profile.
+    for _, field in ipairs(Addon.Constants.PROFILE_FIELD_ORDER) do
+        if field ~= "status" and type(profile[field]) == "string" and profile[field]:find("%S") then
+            return true
+        end
+    end
+    return false
 end
 
 local function EmptyProfile()
@@ -48,7 +83,7 @@ function MSP:GetLibrary()
 end
 
 function MSP:CanRequest(characterKey)
-    return type(characterKey) == "string"
+    return self:IsEnabled() and type(characterKey) == "string"
         and not Addon.Presence:IsSelf(characterKey)
         and Addon.Privacy:CanInteract(characterKey, "WHISPER", false)
 end
@@ -71,9 +106,34 @@ function MSP:ObserveUnit(unit, characterKey, source)
         return false, "cooldown"
     end
 
-    -- LibMSP merges realm names itself.  Keep the client-provided identity
-    -- intact: do not manufacture aliases or remove realm components here.
-    local requested = library:Request(characterKey)
+    -- Lookup keys are for MSP's cache, not transport addressing. Shared library
+    -- versions without the cancellable Forever adapter cannot safely queue an
+    -- automatic observation request; do not replace their globals.
+    if type(library.RequestObserved) ~= "function" then return false, "safe-transport-unavailable" end
+    local detection = Addon.PlayerDetection.units[unit]
+    if not detection or detection.simulated or not Addon.PlayerDetection:IsValid(detection)
+        or detection.characterKey ~= characterKey then return false, "stale-observation" end
+    local recipient, evidence = detection.transportRecipient, detection.recipientSource
+    local trigger = detection.trigger and (":trigger=" .. detection.trigger) or ""
+    if not Addon.ValueAccess:IsString(recipient) or recipient == "" then return false, "no-transport-recipient" end
+    local function Validate()
+        return Addon.Database:IsDiscoveryEnabled() and self:CanRequest(characterKey)
+            and Addon.PlayerDetection.units[unit] == detection
+            and Addon.PlayerDetection:IsValid(detection)
+            and detection.transportRecipient == recipient
+    end
+    local function Report(result, reason)
+        local diagnostics = Addon.DiscoveryDiagnostics
+        if diagnostics then
+            local accepted = result == true or result == 0
+            if reason == "sent" then
+                reason = accepted and "accepted" or ((result == 3 or result == 8) and "throttled" or "failed")
+            end
+            diagnostics:RecordWhisper("C_ChatInfo.SendAddonMessage", "MSP2", recipient,
+                "observed-unit:" .. unit .. ":" .. (evidence or "client-identity") .. trigger, accepted, reason, result)
+        end
+    end
+    local requested = library:RequestObserved(characterKey, recipient, Validate, Report)
     if requested == false then
         return false, "rejected"
     end
@@ -141,9 +201,10 @@ function MSP:StoreProfile(characterKey, profile)
         return false, "privacy"
     end
     local sanitized = Addon.Profile:SanitizeRemoteProfile(profile)
-    if not sanitized then
+    if not sanitized or not HasContent(sanitized) then
         return false, "profile"
     end
+    characterKey = StoredKey(self.profiles, characterKey)
     if not self.profiles[characterKey] then
         local count = 0
         for _ in pairs(self.profiles) do count = count + 1 end
@@ -161,6 +222,7 @@ function MSP:StoreProfile(characterKey, profile)
 end
 
 function MSP:OnReceived(sender)
+    if not self:IsEnabled() then return false end
     local library = self:GetLibrary()
     local characterKey = self:FindObservedKey(sender)
     if not library or not characterKey then
@@ -172,12 +234,18 @@ function MSP:OnReceived(sender)
         return false
     end
     if Addon.ProfileViewer then
-        Addon.ProfileViewer:ShowMSP(characterKey)
+        if Addon.RemoteProfiles:HasProfile(characterKey, false) then
+            Addon.ProfileViewer:RefreshIfViewing(characterKey)
+        elseif not Addon.ProfileTransfer or not Addon.ProfileTransfer:IsRequestPending(characterKey, false) then
+            Addon.ProfileViewer:ShowMSP(characterKey)
+        end
     end
     return true
 end
 
 function MSP:GetProfile(characterKey)
+    characterKey = StoredKey(self.profiles, characterKey)
+    if not characterKey or not self:CanRequest(characterKey) then return nil end
     local entry = self.profiles[characterKey]
     if not entry then
         return nil
@@ -208,7 +276,7 @@ function MSP:InitializeTransportDiagnostics()
         if Addon.DiscoveryDiagnostics then
             -- Secure post-hooks expose arguments, NOT the original API's result.
             Addon.DiscoveryDiagnostics:RecordWhisper(api, "MSP2", target,
-                "shared-MSP2:Chomp/CTL-after-Ambiguate", nil, "result-not-exposed-by-hook")
+                "shared-MSP2:API-bound", nil, "result-not-exposed-by-hook")
         end
     end
     for _, method in ipairs({"SendAddonMessage", "SendAddonMessageLogged"}) do

@@ -1,5 +1,57 @@
 # Offline communication checks
 
+## Phase 1 candidate
+
+`lua tests/profile_editor_caret.lua` loads the actual profile editor with mocked
+widgets. It checks multiline caret focus/blinking, client cursor movement,
+wrapped-text scrolling, hidden/invalid geometry, unchanged save/Escape behavior
+and isolation from short fields. It cannot prove live rendering or alignment.
+
+`lua tests/local_chat.lua` exercises actual Core output routing and chat-tab
+creation/reuse with mocked client APIs: buffered startup, debug gating, modeled
+reload, tab selection/history/filters, closed/renamed tabs, full-slot/API fallback,
+combat deferral and legacy chat globals. Network send/join functions throw if
+called. Live tab appearance and persistence still need a client check.
+
+Run every suite from the repository root (Lua 5.1):
+
+```powershell
+Get-ChildItem tests -Filter '*.lua' | Sort-Object Name | ForEach-Object {
+    lua $_.FullName
+    if ($LASTEXITCODE -ne 0) { throw "Failed: $($_.Name)" }
+}
+Get-ChildItem ForeverRP,tests,experiments -Recurse -Filter '*.lua' | ForEach-Object {
+    luac -p $_.FullName
+    if ($LASTEXITCODE -ne 0) { throw "Syntax failed: $($_.FullName)" }
+}
+```
+
+`phase1_same_layer.lua` loads current native modules through its own mocked
+client fixture, including real startup, event dispatch, lifecycle, privacy,
+profile requests/responses, notifications, tooltip processing, markers and the
+Privacy/Directory widgets. It checks saved Beta 17 opt-ins cannot enable joins,
+registration, advertisements, probes, layer events or metadata-based presence;
+the Beta 5 handshake remains sufficient with observable/range-qualified units.
+It checks local dot pooling/projection, invalid/secret positions, token reuse,
+alternative validated units, combat, movement, expiry, approval/cancellation,
+restricted trust changes and persisted profiles/Connections through modeled reload.
+MSP and MingleBar are stubbed in this focused fixture; the existing MSP/library
+suites test the retained compatibility implementation. MingleBar needs live testing.
+
+Historical Directory/layer/advertisement-marker tests retain their assertions.
+`helpers/client_fixture.lua` explicitly loads Activity and markers from
+`experiments/beta17/`; layer tests also use archived inference/event wiring.
+These archives are excluded from the addon folder and ZIP. Their passing tests
+protect retained experimental work, **not** claims about enabled Phase 1 features.
+Existing native discovery, notification, restricted-value/range, profile,
+Connections and transport checks still run. Build-string assertions identify the
+new candidate. Do not skip failures or re-enable experimental source in the TOC.
+
+The older feature-specific descriptions below describe their historical fixtures.
+The current live gate is [PHASE1_SAME_LAYER_TEST.md](../docs/PHASE1_SAME_LAYER_TEST.md).
+No offline test proves live multiplayer delivery, position availability, taint,
+audio or visual layout.
+
 Run `lua tests/communication.lua` or `luajit tests/communication.lua` from the
 repository root. Requires Lua 5.1 or LuaJIT; no external Lua libraries.
 
@@ -29,6 +81,8 @@ lua tests/directory.lua
 lua tests/forever_transport.lua
 lua tests/privacy_ux.lua
 lua tests/directory_transport.lua
+lua tests/directory_diagnostics.lua
+lua tests/directory_ordering.lua
 lua tests/range_restrictions.lua
 ```
 
@@ -124,3 +178,13 @@ combat or with unknown/inaccessible lockdown evidence. It exercises the actual
 mouseover observation path and recovery through the existing Nearby ticker.
 Directory metadata remains independent of range. Mock blocked-event counters
 are not the client taint engine; see docs/RANGE_BLOCKED_RETEST.md for live steps.
+
+Profile source precedence and real receive/cache/viewer regression: lua tests/profile_sources.lua
+
+Profile pipeline and bounded diagnostic checks: lua tests/profile_pipeline.lua
+Actual Beta 12 responder replay: lua tests/profile_pipeline.lua build/beta12-profile-audit/ForeverRP
+
+Layer inference, bounded metadata and Directory rendering: lua tests/layer_evidence.lua
+Actual older-client parser replay: lua tests/layer_evidence.lua build/beta12-profile-audit/ForeverRP
+Minimap pooled-frame cleanup and freshness: lua tests/player_markers.lua
+These mocks do not establish live layer accuracy or cross-layer transport delivery.

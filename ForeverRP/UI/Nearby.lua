@@ -87,11 +87,20 @@ function Addon.NearbyUI:CreateRow(index)
 end
 
 function Addon.NearbyUI:SelectPlayer(characterKey, simulated)
+    if Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordProfile then
+        Addon.DiscoveryDiagnostics:RecordProfile("nearby-click", characterKey, nil, simulated and "simulated" or "native")
+    end
     if Addon.RemoteProfiles:HasProfile(characterKey, simulated == true) then
+        if Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordProfile then
+            Addon.DiscoveryDiagnostics:RecordProfile("nearby-action", characterKey, nil, "cached-FRP")
+        end
         Addon.ProfileViewer:ShowRemote(characterKey, simulated == true)
         return
     end
     if Addon.ProfileTransfer:IsRequestPending(characterKey, simulated == true) then
+        if Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordProfile then
+            Addon.DiscoveryDiagnostics:RecordProfile("nearby-action", characterKey, nil, "already-pending")
+        end
         return
     end
     if simulated then

@@ -53,7 +53,7 @@ function Addon.PlayerDetection:RemoveUnit(unit)
     return true
 end
 
-function Addon.PlayerDetection:DetectUnit(unit, source)
+function Addon.PlayerDetection:DetectUnit(unit, source, trigger)
     if not ValueAccess:IsString(unit) then
         return false
     end
@@ -70,6 +70,7 @@ function Addon.PlayerDetection:DetectUnit(unit, source)
     if not AddAssociation(characterKey, unit, source, false, recipient, identityEvidence) then
         return false
     end
+    self.units[unit].trigger = trigger
     if not existing or existing.characterKey ~= characterKey then
         Addon:Debug("Player unit detected:", unit, characterKey)
     end
@@ -83,12 +84,12 @@ function Addon.PlayerDetection:DetectUnit(unit, source)
     return true
 end
 
-function Addon.PlayerDetection:RefreshUnit(unit, source)
+function Addon.PlayerDetection:RefreshUnit(unit, source, trigger)
     if not ValueAccess:IsString(unit) then
         return false
     end
     if UnitExists and UnitIsPlayer then
-        self:DetectUnit(unit, source)
+        self:DetectUnit(unit, source, trigger)
     else
         self:RemoveUnit(unit)
     end
@@ -105,7 +106,12 @@ function Addon.PlayerDetection:IsValid(detection)
     if not ValueAccess:IsString(detection.unit) or not ValueAccess:IsString(detection.characterKey) then
         return false
     end
-    return ResolveCharacterKey(detection.unit) == detection.characterKey
+    local characterKey, recipient, evidence = ResolveCharacterKey(detection.unit)
+    if characterKey ~= detection.characterKey then return false end
+    -- A token can retain its lookup identity while its client transport form
+    -- changes. Never reuse a recipient cached by an earlier observation.
+    detection.transportRecipient, detection.recipientSource = recipient, evidence
+    return true
 end
 
 function Addon.PlayerDetection:GetUnits(characterKey, includeSimulated)
@@ -182,8 +188,8 @@ function Addon.PlayerDetection:Initialize()
         return
     end
     self.initialized = true
-    self:RefreshUnit("target", "target")
-    self:RefreshUnit("mouseover", "mouseover")
+    self:RefreshUnit("target", "target", "initial-unit-scan")
+    self:RefreshUnit("mouseover", "mouseover", "initial-unit-scan")
     self:RefreshUnit("focus", "focus")
     self:ScanGroup()
 end

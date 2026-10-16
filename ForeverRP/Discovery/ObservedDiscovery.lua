@@ -100,13 +100,18 @@ function Discovery:Attempt(peer)
     local detection, range = self:Candidate(peer.characterKey)
     if not detection then peer.pending = false; peer.reason = range; return end
     peer.unit, peer.range = detection.unit, range
-    peer.transportRecipient = detection.transportRecipient or peer.characterKey
+    if not Access:IsString(detection.transportRecipient) or detection.transportRecipient == "" then
+        peer.pending = false; peer.reason = "no-transport-recipient"; return
+    end
+    peer.transportRecipient = detection.transportRecipient
     if now < peer.nextAt then return end
     if not Addon.Communication:CanBroadcast() then peer.reason = "prefix-unregistered"; return end
     if not self:TakeBudget(true) then peer.reason = "traffic-limit"; return end
     peer.attempts = peer.attempts + 1
+    local trigger = detection.trigger and (":trigger=" .. detection.trigger
+        .. (peer.attempts > 1 and ":retry-tick" or ":initial-probe")) or ""
     local accepted, reason = Addon.Communication:Send("HELLO", "WHISPER", peer.transportRecipient, peer.characterKey,
-        "observed-unit:" .. detection.unit .. ":" .. (detection.recipientSource or "lookup-key-fallback"))
+        "observed-unit:" .. detection.unit .. ":" .. (detection.recipientSource or "client-identity") .. trigger)
     peer.reason = reason or (accepted and "accepted" or "failed")
     if reason == "throttled" then self.pausedUntil = now + 10 end
     peer.nextAt = now + 10 + (peer.sequence % 6)

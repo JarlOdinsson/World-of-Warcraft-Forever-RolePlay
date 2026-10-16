@@ -25,7 +25,8 @@ local function JoinMessage(...)
 end
 
 function Addon:Print(...)
-    print(self.Constants.ADDON_DISPLAY_NAME .. ": " .. JoinMessage(...))
+    local text = self.Constants.ADDON_DISPLAY_NAME .. ": " .. JoinMessage(...)
+    if self.ChatOutput then self.ChatOutput:Write(text) else print(text) end
 end
 
 function Addon:Debug(...)
@@ -33,7 +34,8 @@ function Addon:Debug(...)
         return
     end
 
-    print(self.Constants.ADDON_DISPLAY_NAME .. " DEBUG: " .. JoinMessage(...))
+    local text = self.Constants.ADDON_DISPLAY_NAME .. " DEBUG: " .. JoinMessage(...)
+    if self.ChatOutput then self.ChatOutput:Write(text) else print(text) end
 end
 
 function Addon:OnAddonLoaded(addonName)
@@ -53,6 +55,7 @@ function Addon:OnPlayerLogin()
         return
     end
 
+    if self.ChatOutput then self.ChatOutput:Initialize() end
     self.Profile:Initialize()
     self.ProfileTransfer:Initialize()
     self.ProfileAuthorization:Initialize()

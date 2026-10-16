@@ -1,4 +1,19 @@
-# First beta release checklist
+# Release records
+
+## Beta 20 same-layer baseline — October 16, 2026
+
+- Version `0.1.1-beta.20`; build `profile-caret-20261016-20`; Interface `16001`.
+- Maintainer reported stable behavior and explicitly authorized a GitHub source push.
+  The older instructions to hold the candidate pending approval are superseded by
+  that instruction. Individual live checklist outcomes have not been supplied;
+  the historical boxes below are not retroactively marked passed.
+- Destination: GitHub `JarlOdinsson/World-of-Warcraft-Forever-RolePlay`, branch `main`.
+  Keep beta numbering; no CurseForge upload is included.
+- Automated baseline: 24 suites, 77 Lua syntax checks; see `build/beta20-validation/`.
+- Release packaging/install evidence and publication status: `docs/BETA20_RELEASE.md`.
+- Directory, location/subzone sharing and cross-layer networking stay disabled.
+
+## Historical first-beta checklist (not current release certification)
 
 ## Release metadata
 

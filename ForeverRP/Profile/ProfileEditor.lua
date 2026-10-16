@@ -97,21 +97,69 @@ local function CreateMultilineField(parent, definition, y)
     editBox:SetFontObject(ChatFontNormal)
     editBox:SetTextInsets(6, 6, 6, 6)
     editBox:SetMaxLetters(Addon.Constants.PROFILE_LIMITS[definition.key])
+    -- The native caret can be invisible in these nested scrolling edit boxes.
+    -- Draw a contrasting caret at the client-reported cursor rectangle. Keep
+    -- native text input, selection and cursor movement entirely with the client.
+    local caret = editBox:CreateTexture(nil, "OVERLAY", nil, 7)
+    caret:SetColorTexture(1, 1, 1, 1)
+    caret:Hide()
+    local cursorKnown, blinkElapsed = false, 0
+    local function HideCaret()
+        caret:Hide()
+        editBox:SetScript("OnUpdate", nil)
+    end
+    local function BlinkCaret(box, elapsed)
+        if not box:HasFocus() then HideCaret(); return end
+        blinkElapsed = (blinkElapsed + elapsed) % 1
+        caret:SetShown(blinkElapsed < 0.5)
+    end
+    local function ShowCaret()
+        if not cursorKnown or not editBox:HasFocus() or not editBox:IsVisible() then return end
+        blinkElapsed = 0
+        caret:Show()
+        editBox:SetScript("OnUpdate", BlinkCaret)
+    end
+    editBox:SetScript("OnEditFocusGained", ShowCaret)
+    editBox:SetScript("OnHide", HideCaret)
+    editBox:SetScript("OnShow", ShowCaret)
     editBox:SetScript("OnEscapePressed", function(box)
         box:SetText(Addon.Profile:GetField(definition.key) or "")
         box:ClearFocus()
     end)
     editBox:SetScript("OnEditFocusLost", function()
+        HideCaret()
         Editor:CommitField(definition.key)
     end)
     editBox:SetScript("OnTextChanged", function(box)
         UpdateMultilineHeight(box, definition.height)
         scrollFrame:UpdateScrollChildRect()
     end)
-    editBox:SetScript("OnCursorChanged", function(_, _, cursorY, _, cursorHeight)
+    editBox:SetScript("OnCursorChanged", function(box, cursorX, cursorY, _, cursorHeight)
+        if not Addon.ValueAccess:CanAccess(cursorX, cursorY, cursorHeight)
+            or type(cursorX) ~= "number" or type(cursorY) ~= "number" or type(cursorHeight) ~= "number"
+            or cursorX ~= cursorX or cursorY ~= cursorY or cursorHeight ~= cursorHeight
+            or math.abs(cursorX) == math.huge or math.abs(cursorY) == math.huge
+            or cursorHeight <= 0 or cursorHeight == math.huge then
+            cursorKnown = false
+            HideCaret()
+            return
+        end
+        caret:ClearAllPoints()
+        caret:SetPoint("TOPLEFT", box, "TOPLEFT", cursorX, cursorY)
+        caret:SetSize(2, cursorHeight)
+        cursorKnown = true
+        ShowCaret()
+        -- Refreshing an unfocused field must not move its scroll position.
+        if not box:HasFocus() then return end
         local offset = scrollFrame:GetVerticalScroll()
-        local cursorTop = -cursorY
+        local cursorTop = math.max(0, -cursorY)
         local cursorBottom = cursorTop + cursorHeight
+        -- The character-count estimate above can undershoot wrapped text with
+        -- wide glyphs or a larger chat font. Keep the actual cursor unclipped.
+        if cursorBottom + 6 > box:GetHeight() then
+            box:SetHeight(cursorBottom + 6)
+            scrollFrame:UpdateScrollChildRect()
+        end
         if cursorTop < offset then
             scrollFrame:SetVerticalScroll(cursorTop)
         elseif cursorBottom > offset + scrollFrame:GetHeight() then
@@ -157,7 +205,7 @@ function Editor:Create(parent)
 
     local statusLabel = content:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     statusLabel:SetPoint("TOPLEFT", 242, -216)
-    statusLabel:SetText(Addon:GetText("PROFILE_STATUS"))
+    statusLabel:SetText(Addon:GetText("PROFILE_MY_STATUS"))
 
     local statusDropdown = CreateFrame("Frame", "ForeverRPProfileStatusDropdown", content, "UIDropDownMenuTemplate")
     statusDropdown:SetPoint("TOPLEFT", statusLabel, "BOTTOMLEFT", -16, -2)
@@ -174,6 +222,7 @@ function Editor:Create(parent)
                 UIDropDownMenu_SetSelectedValue(statusDropdown, statusValue)
                 UIDropDownMenu_SetText(statusDropdown, Addon:GetText("PROFILE_STATUS_" .. statusValue))
                 self:UpdateCompletion()
+                if Addon.ActivityUI then Addon.ActivityUI:RefreshMyStatus() end
             end
             UIDropDownMenu_AddButton(info, level)
         end

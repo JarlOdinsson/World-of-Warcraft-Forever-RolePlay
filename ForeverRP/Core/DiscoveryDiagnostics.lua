@@ -23,24 +23,60 @@ local function Identity(value)
     return Access:IsString(value) and value:sub(1, 100) or Text(value)
 end
 
+-- Profile pipeline metadata only. No payload, profile fields or notes accepted.
+function Diagnostics:RecordProfile(stage, peer, id, reason, recipient, index, total)
+    if not Addon.Database or not Addon.Database:IsDebugEnabled()
+        or not Access:CanAccess(stage, peer, id, reason, recipient, index, total) then return end
+    -- First/last chunks and failures are enough to locate a broken boundary.
+    if (stage == "receive" or stage == "chunk-send" or stage == "chunk-accepted")
+        and type(index) == "number" and index ~= 1 and index ~= total then return end
+    local now = Now()
+    if not self.profileWindow or now - self.profileWindow >= 60 then
+        self.profileWindow, self.profileCount, self.profileSeen = now, 0, {}
+    end
+    if self.profileCount >= 60 then return end
+    local signature = table.concat({Text(stage), Text(peer), Text(id), Text(reason), Text(recipient), Text(index)}, "\031")
+    if self.profileSeen[signature] and now - self.profileSeen[signature] < 5 then return end
+    self.profileSeen[signature] = now; self.profileCount = self.profileCount + 1
+    local line = "PROFILE t=" .. string.format("%.1f", now) .. " stage=" .. Text(stage)
+        .. " key=[" .. Text(peer) .. "] id=" .. Text(id) .. " reason=" .. Text(reason)
+        .. " raw=[" .. Text(recipient) .. "] chunk=" .. Text(index) .. "/" .. Text(total)
+    self.profileTrace = self.profileTrace or {}
+    self.profileTrace[#self.profileTrace + 1] = line
+    if #self.profileTrace > 64 then table.remove(self.profileTrace, 1) end
+    Addon:Print(line)
+end
+
+function Diagnostics:ReportProfiles()
+    if self.lastProfileReport and Now() - self.lastProfileReport < 5 then return false end
+    self.lastProfileReport = Now()
+    Addon:Print("PROFILE build=" .. Text(Addon.Constants.DIAGNOSTIC_BUILD) .. " MSP="
+        .. (not Addon.MSPCompatibility and "absent" or Addon.MSPCompatibility:IsEnabled() and "ON" or "OFF")
+        .. " debug=" .. Text(Addon.Database:IsDebugEnabled()) .. " (enable debug before requesting)")
+    local history = self.profileTrace or {}
+    for i = math.max(1, #history - 11), #history do Addon:Print(history[i]) end
+    return true
+end
+
 -- Debug only; bounded output/history and no payloads, profiles or notes.
-function Diagnostics:RecordWhisper(api, kind, recipient, source, accepted, reason, result)
+function Diagnostics:RecordWhisper(api, kind, recipient, source, accepted, reason, result, prefix)
     if not Addon.Database or not Addon.Database:IsDebugEnabled() then return end
-    if not Access:CanAccess(api, kind, recipient, source, accepted, reason, result) then return end
+    if not Access:CanAccess(api, kind, recipient, source, accepted, reason, result, prefix) then return end
+    prefix = prefix or (kind == "MSP2" and "MSP2" or "FOREVERRP")
     local now = Now()
     if not self.whisperWindow or now - self.whisperWindow >= 60 then
         self.whisperWindow, self.whisperCount, self.whisperSeen = now, 0, {}
     end
     if self.whisperCount >= 30 then return end
-    local signature = table.concat({Text(api), Text(kind), Text(recipient), Text(source), Text(reason), Text(result)}, "\031")
+    local signature = table.concat({Text(prefix), Text(api), Text(kind), Text(recipient), Text(source), Text(reason), Text(result)}, "\031")
     if self.whisperSeen[signature] and now - self.whisperSeen[signature] < 10 then return end
     self.whisperSeen[signature] = now
     self.whisperCount = self.whisperCount + 1
     self.whispers = self.whispers or {}
     self.whispers[#self.whispers + 1] = {at = now, api = Text(api), kind = Text(kind), recipient = Text(recipient),
-        source = Text(source), accepted = accepted, reason = Text(reason), result = Text(result)}
+        source = Text(source), accepted = accepted, reason = Text(reason), result = Text(result), prefix = Text(prefix)}
     if #self.whispers > 20 then table.remove(self.whispers, 1) end
-    Addon:Print("WHISPER t=" .. string.format("%.1f", now) .. " api=" .. Text(api) .. " type=" .. Text(kind)
+    Addon:Print("WHISPER t=" .. string.format("%.1f", now) .. " api=" .. Text(api) .. " prefix=" .. Text(prefix) .. " type=" .. Text(kind)
         .. " recipient=[" .. Text(recipient) .. "] source=" .. Text(source)
         .. " enqueue=" .. (accepted == nil and "unobserved" or accepted and "accepted" or "rejected")
         .. " reason=" .. Text(reason) .. " result=" .. Text(result))

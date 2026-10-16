@@ -4,11 +4,28 @@ ForeverRP provides roleplaying profiles, automatic discovery of consenting Forev
 
 ## Current version
 
-`0.1.1-beta.11` — build `directory-transport-20261010-11` (controlled multiplayer test build).
+`0.1.1-beta.20` — build `profile-caret-20261016-20` (**same-layer beta baseline**).
 
-Beta.9 fixes the bundled Chomp login/Battle.net parser for Forever multiword names and its related MSP recipient corruption. It adds bounded debug-only tracing of actual whisper recipients. The yellow player-not-found error has a reproducible MSP corruption path, but actual delivery still needs retesting; no speculative discovery address rewrite is included. See [the Beta.9 retest guide](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/BETA9_TRANSPORT_RETEST.md), including shared-library load-order limitations and login/reload tests.
+This build restores the Beta 5 native discovery baseline for same-layer discovery
+while preserving later privacy, identity, profile-transfer and combat fixes.
+Directory advertisements, shared-channel recovery and layer inference are paused.
+The menus retain their existing layout and explain the unavailable controls.
 
-This beta includes player detection, profile requests and viewing, private Connections, configurable discovery notifications, and the optional MingleBar RP action bar. Live testers have confirmed detection and profile retrieval. Broader testing across client settings, combat, crowded areas, and layers continues.
+ForeverRP notices, command results, discovery text and enabled debug output now
+appear in a dedicated local **ForeverRP** chat tab. The tab is reused on reload,
+and creating it preserves your selected tab. No reports are sent to other players.
+If chat slots are full or the chat API is unavailable, a one-time explanation and
+reports appear in the main local chat window; free a tab and `/reload` to retry.
+
+Beta 20 adds a visible blinking caret to the long profile text boxes and keeps
+it in view while editing wrapped text. The current build was accepted by the
+maintainer as the same-layer beta baseline on October 16, 2026.
+
+This remains beta software. Client-specific limitations include conservative
+range checks, positions unavailable for some units, and hidden dots during combat.
+Directory and cross-layer networking remain disabled. For repeatable checks,
+use the [two-player checklist](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/PHASE1_SAME_LAYER_TEST.md)
+and [profile cursor retest](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/BETA20_PROFILE_CARET_RETEST.md).
 
 ## Installation
 
@@ -34,19 +51,32 @@ A visible player is not automatically a ForeverRP user. A valid ForeverRP exchan
 
 Detection without a shared party or guild depends on the client exposing an observable unit and delivering the directed handshake. Friendly nameplate settings and visibility can affect automatic pass-by coverage. ForeverRP cannot enumerate every roleplayer on the server or guarantee detection of every passing player.
 
-Range choices use conservative interaction-distance brackets rather than exact yard measurements. The 20- and 25-yard settings use the available closer bracket conservatively. Real interaction checks run only when the client explicitly reports combat lockdown inactive. During lockdown, or when combat/range evidence is unavailable or restricted, range is Unknown and cannot qualify a player for Nearby. The normal ticker reevaluates after combat; Directory discovery does not depend on these range checks.
+Range choices use conservative interaction-distance brackets rather than exact yard measurements. The 20- and 25-yard settings use the available closer bracket conservatively. Real interaction checks run only when the client explicitly reports combat lockdown inactive. During lockdown, or when combat/range evidence is unavailable or restricted, range is Unknown and cannot qualify a player for Nearby. The normal ticker reevaluates after combat. Directory discovery is paused in Phase 1.
 
 Notifications can pulse the minimap icon, play a sound, and print an optional chat message. Choose **Bing Bong**, **Drumroll** (legacy ready-check sound), or **None**. New installations default to the bundled spoken Bing Bong; upgrades preserve the legacy sound and existing channel/enable settings. **Test Sound** previews the selected **Master** (default) or **Sound Effects** channel. ForeverRP does not change global volume or silently switch channels. A failed or unconfirmed preview reports a limitation; actual loudness and Master routing still require client testing. Preview clicks are rate-limited and do not consume discovery cooldowns.
 
 Automatic notifications retain the per-player cooldown (10 minutes by default). Changes between eligible range brackets do not trigger another entry alert. Presence expires after 15 minutes without renewal; eligible communications renew it conservatively.
 
-Cross-layer delivery remains unverified. **Privacy** contains an experimental network toggle, off by default. When Visible and opted in, it joins `ForeverRPActivity` and sends compact addon metadata over available group/guild/shared-channel routes. This is a transport prototype, not a verified server-wide discovery service. Friends/Guild Only uses eligible social routes and does not join the shared channel. Hidden sends no activity advertisements. No messages are relayed.
+Directory, cross-layer advertisements, shared-channel joins/recovery and layer
+inference are unavailable in Phase 1. Existing experimental preferences remain
+saved, but cannot enable these paths. The addon leaves an old `ForeverRPActivity`
+subscription once on login and does not register or send its experimental prefix.
+Native guild/party presence exchanges are retained; they establish neither
+proximity nor layer membership. No layer number is inferred.
 
-The Privacy panel shows Discovery Visibility (changed in Settings) and whether the saved Experimental Network preference is paused. Hidden visibility or disabled discovery blocks directory networking. Directory Participation OFF stops listing your character while still allowing browsing; withholding location also allows browsing when networking is otherwise enabled.
+**Privacy** retains the current controls and their positions. Experimental Network,
+Directory Participation, location sharing and subzone sharing explain their pause.
+**RP Directory** stays in the menu with an empty, explanatory panel. Use **Nearby**
+for local discovery. Profile permissions and approvals remain available.
 
-Choose **Don't share my location** (default), **Share zone only**, or **Share precise location**. Optional **Subzone sharing** is off by default and requires zone or precise sharing. Optional minimap markers require valid precise coordinates received within 125 seconds, in your current zone and coordinate space. All markers are neutral and noninteractive; layer status is always **Unknown** because no reliable layer identifier is available. Markers do not request or open profiles and do not establish Nearby eligibility. Cross-layer markers, world-wide channel coverage, and map projection need live validation.
-
-**RP Directory** reuses the experimental Activity panel and the existing Presence cache. **Directory participation** is an independent, explicit opt-in in Privacy; it does not enable networking, reveal your location, or grant full-profile access. Both clients must enable experimental networking to exchange directory metadata. Default listings include IC and LF RP users; OOC and AFK require the expanded filter, and DND is always excluded. Search and zone/status filters use cached data without sending requests. Region means continent when the client map hierarchy supplies it, otherwise Unknown. Select **Request Profile** explicitly to use the existing transfer/approval workflow. Character identities are displayed; RP display names and biographies are not broadcast in directory packets.
+**Minimap Markers** remains an independent local display toggle. Neutral dots use
+fresh positions of confirmed, visible Nearby units only when the client exposes
+safe coordinates. No position is stored or transmitted. Range, identity, privacy,
+coordinate space, zoom and rotation are checked before display; missing or
+restricted information and combat hide dots. Dots do not open or request profiles.
+Some unit/context combinations may not expose positions: record those limitations
+in the live test rather than substituting remote advertisements or guessed dots.
+The paused location-sharing preference controls no outgoing traffic in this build.
 
 ## Profiles, Connections, and privacy
 
@@ -89,7 +119,7 @@ The optional RP action bar provides 1–12 configurable actions, including Blizz
 | `/frp request <Name-Realm>` | Request a confirmed user's profile; retain the full character name, including spaces |
 | `/frp version` | Show version, build, protocol, and database identifiers |
 
-Developer commands are restored for testing: `/frp debug on|off`, `/frp diag [Name-Realm]`, `/frp hello`, `/frp presence`, and `/frp sim`. Simulation requires debug mode. `/frp network` prints rate-limited traffic counters, Directory channel membership/routes, enqueue results and valid remote receipts without profile contents or coordinates. Enqueue acceptance does not confirm delivery. `/frp privacy` opens disclosure and experimental settings; `/frp directory` opens RP Directory (`/frp activity` remains an alias). Diagnostic output includes character identities; review captures before sharing.
+Developer commands remain available for testing: `/frp debug on|off`, `/frp diag [Name-Realm]`, `/frp diag profile`, `/frp hello`, `/frp presence`, and `/frp sim`. Simulation requires debug mode. `/frp network` prints native counters and the Phase 1 pause; channel/probe/trace commands explain the pause and cannot activate experimental traffic. `/frp privacy` opens permissions and saved settings; `/frp directory` opens the paused Directory (`/frp activity` remains an alias). Diagnostic output includes character identities; review captures before sharing.
 
 ## Experimental external-profile compatibility
 
@@ -99,20 +129,12 @@ Live Total RP 3/MyRolePlay interoperability on Forever is not yet verified, and 
 
 ## Testing and development
 
-See [tests/README.md](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/tests/README.md) in the source repository for offline regression suites and [the guild checklist](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/DIRECTORY_GUILD_TESTING.md) for client validation. Current source includes the Beta 11 restricted-range repair. The installed repair was reported working with no Lua error during local live retesting; the complete combat/context matrix is not yet verified. See [the range-blocked retest guide](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/RANGE_BLOCKED_RETEST.md) for exact coverage and remaining checks, and [the cross-layer Directory procedure](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/CROSS_LAYER_DIRECTORY_RETEST.md) for the independent transport release gate. All 15 offline suites pass (1,827 checks). Offline mocks do not establish live delivery, client taint behavior, visual layout, actual sound volume, or cross-layer compatibility.
+Use [the Phase 1 two-player checklist](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/docs/PHASE1_SAME_LAYER_TEST.md) for the release gate and [tests/README.md](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/blob/main/tests/README.md) for automated checks. Offline tests do not establish multiplayer delivery, unit-position availability, client taint behavior, visual layout or audio. Historical experimental tests load the Beta 17 archive outside the installable addon; they do not represent enabled Phase 1 behavior.
 
-`ForeverRP/ForeverRP.toc` is the authoritative version source. From the repository root, `powershell -ExecutionPolicy Bypass -File tools/package.ps1` creates a validated beta ZIP in `dist/`. Generated packages are not committed. Before a local deployment, back up the existing addon outside the destination and verify installed files against source; leave `WTF` and SavedVariables untouched.
+`ForeverRP/ForeverRP.toc` is the authoritative version source. From the repository root, `powershell -ExecutionPolicy Bypass -File tools/package.ps1` creates a validated ZIP in `dist/`. Generated packages are not committed. Back up the existing addon before replacing its folder; leave `WTF` and SavedVariables untouched.
 
 ## License and support
 
 ForeverRP software is MIT-licensed. Embedded libraries retain their own licenses and notices under `ForeverRP/Libs/MSP` in the source repository (`Libs/MSP` inside the installed addon). The supplied Bing Bong recording has separate redistribution permission; see `Media/Sounds/NOTICE.md`. The software license does not license the recording.
 
 Report bugs at [GitHub Issues](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/issues). Include your `/frp version` output, reproduction steps, privacy mode, and any Lua error. Do not include private notes or personal profile contents.
-
-Beta 11 hardens shared-channel joins and route recovery. Cross-layer Directory
-discovery is a release requirement, with shared-channel delivery still unverified
-on Forever. It does not require mouseover, a visible unit or prior Nearby when
-valid metadata arrives. /frp network distinguishes membership, enqueue results
-and valid remote receipts by transport. Layer remains Unknown; Directory traffic
-does not establish physical proximity. Party/guild receipts alone do not prove
-unrelated-player or cross-layer coverage. The test build does not enable any opt-in.

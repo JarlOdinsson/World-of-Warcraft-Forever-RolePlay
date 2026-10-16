@@ -158,7 +158,7 @@ function Addon.UI:CreateSettingsPanel(parent)
     local privacyOptions = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     privacyOptions:SetSize(220, 24)
     privacyOptions:SetPoint("BOTTOMLEFT", 24, 20)
-    privacyOptions:SetText("Discovery & Profile Privacy")
+    privacyOptions:SetText("Privacy & Sharing")
     privacyOptions:SetScript("OnClick", function() Addon.UI:ShowPanel("privacy") end)
 
     local emoteTitle = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")

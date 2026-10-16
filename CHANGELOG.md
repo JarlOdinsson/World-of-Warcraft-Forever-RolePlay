@@ -2,6 +2,33 @@
 
 All notable user-facing changes to ForeverRP will be documented here.
 
+## 0.1.1-beta.20 — profile-caret-20261016-20 (same-layer beta release package)
+
+- Accepted by the maintainer as the same-layer beta baseline on October 16, 2026. This records maintainer release approval, not an independently observed multiplayer test or a claim that every checklist case passed.
+- Since the last public Beta 5: retain the native same-layer discovery baseline with later privacy, identity-normalization, profile-transfer and combat/API guards. Keep the current menus, Connections, MingleBar, tooltips and notification controls.
+- Include Beta 19's dedicated local ForeverRP chat tab for addon reports. It does not create a shared player channel or post these reports to General.
+- Add a contrasting blinking caret to At a Glance, Description, History and OOC Notes, using the client's reported typing position, addressing the live report of an invisible native cursor in long profile text boxes.
+- Stop caret updates when a field loses focus or is hidden. Preserve native typing, selection, Escape, saving, field limits and the existing layout; short profile fields are unchanged.
+- Keep the actual cursor inside the scrolling content when wrapped text exceeds the estimated height. Unfocused field refreshes no longer move their inner scroll position.
+- Minimap dots use fresh, independently qualified local unit positions when available. Location sharing, Directory, cross-layer advertisements, custom-channel recovery and layer inference remain disabled. Nearby-only position sharing is agreed future work, not included in this release.
+- Automated validation: 24 Lua test suites, 77 Lua syntax checks, package structure and installed-file hash verification. Broader client-specific edge cases remain subject to beta feedback.
+
+## 0.1.1-beta.19 — local-chat-20261014-19 (Phase 1 test candidate)
+
+- Route ForeverRP notices, slash-command results, discovery text and enabled debug output to a dedicated local `ForeverRP` chat tab. These reports are not transmitted to other players.
+- Reuse the saved tab across reloads without clearing its history or user filters; preserve the selected tab when creating it. The new tab starts without general chat/channel subscriptions.
+- Buffer up to 100 startup lines until login. Defer tab creation during combat; if the tab cannot be opened (for example, chat slots are full), explain once and keep reports readable in the main local chat window.
+- Retain Phase 1 discovery, privacy and profile behavior and the pause on Directory/cross-layer traffic. Add focused chat-output tests; live tab appearance/persistence still needs verification.
+
+## 0.1.1-beta.18 — same-layer-phase1-20261014-18 (Phase 1 test candidate)
+
+- Restore the Beta 5 native discovery path as the baseline for same-layer testing: observed-unit HELLO/ACK, confirmed presence, matching unit identity and conservative range checks. Guild/party receipts remain presence only; no layer is inferred.
+- Archive Beta 17's Directory advertisements, custom-channel joins/recovery, layer inference and coordinate-advertisement markers outside the installable addon. Saved experimental preferences cannot enable these paths. Leave an existing `ForeverRPActivity` subscription once on login; do not register or send its addon prefix.
+- Keep the current menus. Explain paused Directory, location/subzone sharing and network controls in their existing positions; retain profile permissions and explicit approvals.
+- Preserve neutral, pooled minimap dots for confirmed Nearby players using fresh, visible local unit positions when safely available. No coordinate packets, cached remote coordinates or inferred layer labels. Missing/restricted positions, identity changes, unknown/out-of-range evidence and combat hide dots.
+- Retain later privacy enforcement, native/MSP source separation, multiword identity and raw-recipient fixes, profile-transfer diagnostics and queues, notification cooldowns, combat guards, Connections and MingleBar.
+- Add Phase 1 runtime regressions; retain historical experimental regression assertions against the archived modules. Package for two-player testing only. Live discovery, dots, profiles, privacy transitions, reload/relog, combat and UI/audio checks remain required before a stable release.
+
 ## 0.1.1-beta.11 — directory-transport-20261010-11 (controlled test build)
 
 - Verify shared-channel membership rather than assuming a join call succeeded; retry at most three times per recovery cycle and rearm on bounded world transitions.

@@ -179,9 +179,12 @@ function Addon.NearbyPlayers:Initialize()
     if C_Timer and C_Timer.NewTicker then
         self.ticker = C_Timer.NewTicker(1, function()
             if Addon.ProfileAuthorization then Addon.ProfileAuthorization:Tick() end
-            if Addon.Activity then Addon.Activity:Tick() end
+            if Addon.Activity and not Addon.Activity.unavailable then Addon.Activity:Tick() end
             if Addon.ObservedDiscovery then Addon.ObservedDiscovery:Tick() end
             self:ReevaluateAll()
+            if Addon.Activity and Addon.Activity.unavailable and Addon.PlayerMarkers then
+                Addon.PlayerMarkers:Refresh()
+            end
         end)
     end
 end

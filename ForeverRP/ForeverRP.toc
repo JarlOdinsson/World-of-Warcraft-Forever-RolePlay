@@ -2,8 +2,8 @@
 ## Title: ForeverRP
 ## Notes: Roleplaying profiles and proximity-based RP discovery for World of Warcraft Forever.
 ## Author: JarlOdinsson
-## Version: 0.1.1-beta.11
-## X-ForeverRP-Build: directory-transport-20261010-11
+## Version: 0.1.1-beta.20
+## X-ForeverRP-Build: profile-caret-20261016-20
 ## SavedVariables: ForeverRPDB
 ## SavedVariablesPerCharacter: ForeverRPCharacterDB
 
@@ -11,6 +11,7 @@ Localization\enUS.lua
 Core\Constants.lua
 Core.lua
 Core\ValueAccess.lua
+UI\ChatOutput.lua
 Core\DiscoveryDiagnostics.lua
 Core\Database.lua
 Libs\MSP\LibStub\LibStub.lua

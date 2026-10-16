@@ -109,6 +109,8 @@ Test("mouseover probes unrelated player; ACK enters Nearby, refreshes UI and not
     Check(f.sent[1].channel, "WHISPER")
     Check(f.sent[1].target, "Linea Aspera-ClassicBetaPvE2")
     Check(f.sent[1].payload:match("^HELLO|1|"), "HELLO|1|")
+    Check(ForeverRP.DiscoveryDiagnostics.whispers[1].prefix, "FOREVERRP")
+    Check(ForeverRP.DiscoveryDiagnostics.whispers[1].source:find("trigger=UPDATE_MOUSEOVER_UNIT", 1, true) ~= nil, true)
     Check(ForeverRP.Presence:IsConfirmed(f.sent[1].target, false), false)
     Check(f.alerts, 0)
     f:Receive()
@@ -467,6 +469,36 @@ Test("eligible bracket and unit changes never replay alerts; reentry respects co
     CheckInteractDistance = function() return true end
     ForeverRP.NearbyPlayers:Reevaluate(peer)
     Check(#f.sounds, 2); Check(f.alerts, 2)
+end)
+
+Test("HELLO retry resolves current raw address even when canonical key is unchanged", function(f)
+    f.units.mouseover = {"Asty", "Pally"}
+    local raw = "Asty Pally"
+    UnitFullName = function(unit)
+        if unit == "player" then return "Local", "Realm" end
+        return "Asty", "Pally"
+    end
+    GetUnitName = function(unit) return unit == "player" and "Local-Realm" or raw end
+    Check(ForeverRP.PlayerDetection:DetectUnit("mouseover", "mouseover"), true)
+    Check(f.sent[1].target, "Asty Pally")
+    raw = "Asty Pally-Realm"
+    f.now = f.now + 12; ForeverRP.ObservedDiscovery:Tick()
+    Check(#f.sent, 2); Check(f.sent[2].target, raw)
+end)
+
+Test("missing observed transport recipient cannot fall back to a canonical lookup key", function(f)
+    f.units.mouseover = {"Asty", "Pally"}
+    UnitFullName = function(unit) return unit == "player" and "Local" or "Asty", unit == "player" and "Realm" or "Pally" end
+    GetUnitName = function(unit) return unit == "player" and "Local-Realm" or "Asty Pally" end
+    local key = ForeverRP.Presence:ResolveUnitIdentity("mouseover")
+    local resolve = ForeverRP.Presence.ResolveUnitIdentity
+    ForeverRP.Presence.ResolveUnitIdentity = function(self, unit)
+        if unit == "mouseover" then return key, nil end
+        return resolve(self, unit)
+    end
+    Check(ForeverRP.PlayerDetection:DetectUnit("mouseover", "mouseover"), true)
+    Check(#f.sent, 0)
+    Check(ForeverRP.ObservedDiscovery.peers[key:lower()].reason, "no-transport-recipient")
 end)
 
 print(string.format("PASS: %d observed discovery cases; %d checks", cases, checks))

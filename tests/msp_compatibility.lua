@@ -22,7 +22,13 @@ local function Fixture()
         IsSelf = function(_, value) return value == f.localKey end,
     }
     ForeverRP.Privacy = {CanInteract = function() return f.privacy end}
-    ForeverRP.PlayerDetection = {GetCharacterKeys = function() return {"Alice-Realm"} end}
+    f.account = {}
+    ForeverRP.Database = {IsDiscoveryEnabled = function() return true end, GetAccount = function() return f.account end}
+    ForeverRP.PlayerDetection = {units = {
+        target = {characterKey = "Alice-Realm", transportRecipient = "Alice-Realm"},
+        mouseover = {characterKey = "Alice-Realm", transportRecipient = "Alice-Realm"},
+    }, IsValid = function() return true end,
+        GetCharacterKeys = function() return {"Alice-Realm"} end}
     ForeverRP.Profile = {
         SanitizeRemoteProfile = function(_, profile)
             for _, field in ipairs(ForeverRP.Constants.PROFILE_FIELD_ORDER) do
@@ -31,14 +37,22 @@ local function Fixture()
             return profile
         end,
     }
-    ForeverRP.ProfileViewer = {ShowMSP = function(_, key) f.opened = key; return true end}
-    ForeverRP.RemoteProfiles = {StoreProfile = function() error("MSP must not write ForeverRP remote profiles") end}
+    ForeverRP.ProfileViewer = {ShowMSP = function(_, key) f.opened = key; return true end,
+        Refresh = function() end}
+    ForeverRP.RemoteProfiles = {HasProfile = function() return false end,
+        StoreProfile = function() error("MSP must not write ForeverRP remote profiles") end}
     msp = {
         char = {},
         callback = {received = {}},
         Request = function(_, name)
             f.requested[#f.requested + 1] = name
             return 1
+        end,
+        RequestObserved = function(self, name, recipient, validate)
+            f.validate = validate
+            if not validate() then return false end
+            Check(recipient, "Alice-Realm")
+            return self:Request(name)
         end,
     }
     dofile("ForeverRP/Discovery/MSPCompatibility.lua")
@@ -62,6 +76,34 @@ Test("privacy and local identity prevent MSP requests", function()
     f.privacy = true
     Check(f.msp:ObserveUnit("target", "Local-Realm", "target"), false)
     Check(#f.requested, 0)
+end)
+
+Test("shared MSP without cancellable transport never falls back to an unsafe probe", function()
+    local f = Fixture()
+    msp.RequestObserved = nil
+    local accepted, reason = f.msp:ObserveUnit("target", "Alice-Realm", "target")
+    Check(accepted, false); Check(reason, "safe-transport-unavailable"); Check(#f.requested, 0)
+end)
+
+Test("diagnostic toggle isolates integration, cancels queued validation and survives reload", function()
+    local f = Fixture()
+    local shared = msp
+    Check(f.msp:ObserveUnit("target", "Alice-Realm", "target"), true)
+    f.msp:SetEnabled(false)
+    Check(f.validate(), false)
+    Check(f.account.diagnosticMSPDisabled, true)
+    Check(f.msp:IsEnabled(), false)
+    Check(f.msp:ObserveUnit("target", "Alice-Realm", "target"), false)
+    msp.char["Alice-Realm"] = {field = {NA = "External Alice"}}
+    Check(f.msp:OnReceived("Alice-Realm"), false)
+    Check(f.msp:GetProfile("Alice-Realm"), nil)
+    Check(f.opened, nil); Check(msp, shared)
+    dofile("ForeverRP/Discovery/MSPCompatibility.lua")
+    Check(ForeverRP.MSPCompatibility:IsEnabled(), false)
+    ForeverRP.MSPCompatibility:SetEnabled(true)
+    Check(f.account.diagnosticMSPDisabled, nil)
+    Check(ForeverRP.MSPCompatibility:IsEnabled(), true)
+    Check(ForeverRP.MSPCompatibility:OnReceived("Alice-Realm"), true)
 end)
 
 Test("received MSP data is validated, isolated, and opened in the existing viewer", function()

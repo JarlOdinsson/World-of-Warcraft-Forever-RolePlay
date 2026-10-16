@@ -221,6 +221,7 @@ end
 -- Optional metadata lives on the existing presence record, never a second peer cache.
 -- Broad metadata may occupy free slots but cannot evict legacy discovery records.
 function Addon.Presence:UpdateActivity(characterKey, activity, version, recipient)
+    if Addon.Activity and Addon.Activity.unavailable then return false end
     local existing = self:ResolveKnownKey(characterKey, false)
     characterKey = existing or characterKey
     local record = self.players[characterKey]

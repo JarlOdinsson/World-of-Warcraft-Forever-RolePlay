@@ -18,7 +18,7 @@
 -- client. Normal LibStub negotiation preserves a newer shared implementation.
 local _, _, _, clientInterface = GetBuildInfo()
 local isForever = clientInterface == 16001
-local VERSION = isForever and 25 or 24
+local VERSION = isForever and 26 or 24
 
 if IsLoggedIn() then
 	error(("Chomp Message Library (embedded: %s) cannot be loaded after login."):format((...)))

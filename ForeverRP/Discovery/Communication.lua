@@ -53,7 +53,7 @@ local function SendAddonPacket(prefix, payload, channel, target, messageType, re
     if channel == "WHISPER" and Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordWhisper then
         Addon.DiscoveryDiagnostics:RecordWhisper(C_ChatInfo and C_ChatInfo.SendAddonMessage and "C_ChatInfo.SendAddonMessage" or "SendAddonMessage",
             messageType or "unknown", target, recipientSource or "caller-target", success,
-            success and "accepted" or throttled and "throttled" or "failed", result)
+            success and "accepted" or throttled and "throttled" or "failed", result, prefix)
     end
     if IsSuccess(result, "SendAddonMessageResult") then
         return true, "accepted", result
@@ -404,9 +404,10 @@ function Addon.Communication:StartPresenceLifecycle()
     end)
 end
 
-function Addon.Communication:OnAddonMessage(prefix, payload, channel, sender, target, zoneChannelID, localID, channelName)
+function Addon.Communication:OnAddonMessage(prefix, payload, channel, sender, target, zoneChannelID, localID, channelName, instanceID)
+    if not Addon.ValueAccess:IsString(prefix) then return end
     if Addon.Activity and prefix == Addon.Activity.prefix then
-        Addon.Activity:Receive(payload, channel, sender, localID, channelName)
+        Addon.Activity:Receive(payload, channel, sender, localID, channelName, target, zoneChannelID, instanceID)
         return
     end
     self:HandleIncoming(prefix, payload, channel, sender, false)
@@ -419,13 +420,24 @@ function Addon.Communication:HandleIncoming(prefix, payload, channel, sender, si
 
     local characterKey = Addon.Presence:NormalizeCharacterKey(sender)
     if not characterKey then
+        if Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordProfile then
+            Addon.DiscoveryDiagnostics:RecordProfile("packet-reject", nil, nil, "invalid-sender", sender)
+        end
         RecordIncoming("INVALID", sender, nil, channel, "invalid-sender", simulated)
         Addon:Debug("Malformed packet ignored: invalid sender")
         return
     end
 
     local packet, reason = self:Parse(payload)
+    local function ProfileTrace(stage, decision)
+        if not simulated and Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordProfile
+            and (not packet or packet.messageType:match("^PROFILE_")) then
+            Addon.DiscoveryDiagnostics:RecordProfile(stage, characterKey, packet and packet.messageId,
+                decision, sender, packet and packet.chunkIndex, packet and packet.totalChunks)
+        end
+    end
     if not packet then
+        ProfileTrace("packet-reject", reason)
         RecordIncoming("INVALID", sender, characterKey, channel, reason, simulated)
         if reason == "unsupported protocol" then
             Addon:Debug(Addon:GetText("UNSUPPORTED_PROTOCOL"))
@@ -436,26 +448,36 @@ function Addon.Communication:HandleIncoming(prefix, payload, channel, sender, si
     end
 
     if Addon.Presence:IsSelf(characterKey) then
+        ProfileTrace("packet-reject", "self")
         RecordIncoming(packet.messageType, sender, characterKey, channel, "self", simulated)
         return
     end
 
     if not Addon.Privacy:CanInteract(characterKey, channel, simulated == true) then
+        ProfileTrace("packet-reject", "privacy")
         RecordIncoming(packet.messageType, sender, characterKey, channel, "privacy", simulated)
         Addon:Debug(packet.messageType, "ignored by privacy policy", characterKey)
         return
     end
 
     local presenceMessage = packet.messageType == "HELLO" or packet.messageType == "ACK"
+    if not presenceMessage then
+        -- Match the complete confirmed identity with the same case-insensitive
+        -- semantics as requests. Keep the original sender for reply transport.
+        characterKey = Addon.Presence:ResolveKnownKey(characterKey, simulated == true) or characterKey
+    end
     if presenceMessage and not simulated and channel == "WHISPER"
         and Addon.ObservedDiscovery and not Addon.ObservedDiscovery:Enabled() then
         RecordIncoming(packet.messageType, sender, characterKey, channel, "discovery-disabled", false)
         return
     end
     if not presenceMessage and not Addon.Presence:IsConfirmed(characterKey, simulated == true) then
+        ProfileTrace("packet-reject", "unconfirmed-sender")
         Addon:Debug(packet.messageType, "ignored from unconfirmed sender", characterKey)
         return
     end
+
+    ProfileTrace("receive", "accepted:" .. packet.messageType)
 
     -- A withdrawal/control notice is not a renewed presence advertisement.
     if packet.messageType == "PROFILE_STATUS" then
@@ -495,7 +517,24 @@ function Addon.Communication:RegisterCompatibilityPrefix(prefix)
 end
 
 function Addon.Communication:SendActivity(payload, channel, target)
-    if not Addon.Activity or not Addon.Activity.registered or type(payload) ~= "string"
+    if not Addon.Activity or Addon.Activity.unavailable then return false, "phase1-disabled" end
+    local record = Addon.Activity and Addon.Activity:TracePacket("TX", payload, channel,
+        Addon.Presence:GetLocalCharacterKey(), nil, nil, {target = target})
+    local accepted, reason, result = self:SendActivityPacket(payload, channel, target)
+    if record then
+        record.result = Addon.ValueAccess:CanAccess(result) and tostring(result) or "<inaccessible>"
+        record.api = (reason == "privacy-or-unavailable" or reason == "unavailable" or reason == "isolation" or reason == "throttled" and result == nil)
+            and "not-called" or (C_ChatInfo and C_ChatInfo.SendAddonMessage and "C_ChatInfo.SendAddonMessage" or "SendAddonMessage")
+        local id = Addon.ValueAccess:IsString(payload) and payload:match("^T1|([%w_%-]+)$")
+        if id then record.id = id end
+    end
+    if Addon.Activity then Addon.Activity:FinishTrace(record, "TX", channel, accepted and "enqueue-accepted" or "rejected", reason) end
+    return accepted, reason, result
+end
+function Addon.Communication:SendActivityPacket(payload, channel, target)
+    if not Addon.Activity or Addon.Activity.unavailable then return false, "phase1-disabled" end
+    if Addon.Activity and Addon.Activity.channelOnly and channel ~= "CHANNEL" then return false, "isolation" end
+    if not Addon.Activity or not Addon.Activity.registered or not Addon.ValueAccess:IsString(payload)
         or #payload > 200 or not Addon.Privacy:CanBroadcast(channel)
         or not Addon.Database:IsDiscoveryEnabled() then return false, "privacy-or-unavailable" end
     if not Addon.Activity:TakeBudget() then return false, "throttled" end

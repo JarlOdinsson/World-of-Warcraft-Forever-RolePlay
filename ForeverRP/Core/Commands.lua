@@ -24,6 +24,37 @@ end
 function Addon.Commands:Handle(message)
     local rawCommand = Trim(message)
     local command = string.lower(rawCommand)
+    if Addon.Activity and Addon.Activity.unavailable and command:match("^network%s+") then
+        Addon.Activity:ReportTransport()
+        return
+    end
+    if command == "network channel on" or command == "network channel off" then
+        Addon.Activity:SetChannelOnly(command == "network channel on")
+        Addon:Print("Directory isolation: " .. (Addon.Activity.channelOnly and "CHANNEL-only" or "normal")
+            .. ". Runtime Directory/layer/marker records cleared. Saved preferences unchanged; /reload restores normal.")
+        return
+    end
+    if command == "network trace" then Addon.Activity:ReportTrace(); return end
+    if command == "network probe" or command:match("^network probe%s+") then
+        local accepted, reason, result = Addon.Activity:Probe(rawCommand:match("^%S+%s+%S+%s+(.+)$"))
+        Addon:Print("Directory probe enqueue=" .. (accepted and "accepted" or "rejected") .. " reason=" .. tostring(reason)
+            .. " result=" .. tostring(result) .. ". /frp network trace for correlation. Enqueue is not delivery.")
+        return
+    end
+    if command == "msp on" or command == "msp off" then
+        Addon.MSPCompatibility:SetEnabled(command == "msp on")
+        Addon:Print("ForeverRP MSP integration " .. (Addon.MSPCompatibility:IsEnabled() and "ON" or "OFF")
+            .. ". Run /reload before the next A/B profile request. Shared MSP libraries are unchanged.")
+        return
+    end
+    if command == "msp status" then
+        Addon:Print("ForeverRP MSP integration: " .. (Addon.MSPCompatibility:IsEnabled() and "ON" or "OFF"))
+        return
+    end
+    if command == "diag profile" then
+        Addon.DiscoveryDiagnostics:ReportProfiles()
+        return
+    end
     if command == "diag" or command:match("^diag%s+") then
         Addon.DiscoveryDiagnostics:Report(rawCommand:match("^%S+%s+(.+)$"))
         return
@@ -60,6 +91,7 @@ function Addon.Commands:Handle(message)
             activity.sent or 0, activity.received or 0, activity.throttled or 0, activity.duplicates or 0,
             activity.expired or 0, Addon.ProfileAuthorization and Addon.ProfileAuthorization.denied or 0, active, markers))
         if Addon.Activity then Addon.Activity:ReportTransport() end
+        if Addon.LayerEvidence then Addon.LayerEvidence:Report() end
         return
     end
 

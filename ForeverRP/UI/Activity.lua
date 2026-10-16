@@ -18,14 +18,23 @@ function UI:Create(parent)
     local title = self.panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 20, -20); title:SetText("RP Directory (Experimental)")
     self.status = Label(self.panel, "", 20, -48, 480)
+    self.myStatus = Label(self.panel, "", 20, -94, 280)
+    self.editStatus = CreateFrame("Button", nil, self.panel, "UIPanelButtonTemplate")
+    self.editStatus:SetPoint("TOPLEFT", 310, -88); self.editStatus:SetSize(170, 24)
+    self.editStatus:SetText("Edit My RP Status")
+    self.editStatus:SetScript("OnClick", function() Addon.UI:ShowPanel("profile") end)
+    self.listingStatus = Label(self.panel, "", 20, -116, 460)
+    Label(self.panel, "Directory Filters: Show players with these statuses.", 20, -144, 460)
+    Label(self.panel, Addon.Activity.unavailable and "Filters paused for Phase 1. Use Nearby for local discovery."
+        or "Only changes your list, not your advertised status.", 20, -160, 460)
     self.search = CreateFrame("EditBox", nil, self.panel, "InputBoxTemplate")
-    self.search:SetPoint("TOPLEFT", 24, -100); self.search:SetSize(160, 24)
+    self.search:SetPoint("TOPLEFT", 24, -198); self.search:SetSize(160, 24)
     self.search:SetAutoFocus(false); self.search:SetMaxLetters(100)
     self.search:SetScript("OnTextChanged", function(box) self.filters.search = box:GetText(); self:Refresh() end)
     self.search:SetScript("OnEscapePressed", function(box) box:ClearFocus() end)
-    Label(self.panel, "Character search", 24, -84, 160)
+    Label(self.panel, "Character search", 24, -182, 160)
     self.statusDropdown = CreateFrame("Frame", "ForeverRPDirectoryStatusDropdown", self.panel, "UIDropDownMenuTemplate")
-    self.statusDropdown:SetPoint("TOPLEFT", 188, -98); UIDropDownMenu_SetWidth(self.statusDropdown, 125)
+    self.statusDropdown:SetPoint("TOPLEFT", 188, -196); UIDropDownMenu_SetWidth(self.statusDropdown, 125)
     UIDropDownMenu_Initialize(self.statusDropdown, function(_, level)
         for _, choice in ipairs({{"DEFAULT", "IC / LF RP"}, {"IC", "IC"}, {"LFRP", "LF RP"}, {"ALL", "Include OOC / AFK"}}) do
             local value, text = choice[1], choice[2]
@@ -37,7 +46,7 @@ function UI:Create(parent)
     end)
     UIDropDownMenu_SetText(self.statusDropdown, "IC / LF RP")
     self.zoneDropdown = CreateFrame("Frame", "ForeverRPDirectoryZoneDropdown", self.panel, "UIDropDownMenuTemplate")
-    self.zoneDropdown:SetPoint("TOPLEFT", 334, -98); UIDropDownMenu_SetWidth(self.zoneDropdown, 120)
+    self.zoneDropdown:SetPoint("TOPLEFT", 334, -196); UIDropDownMenu_SetWidth(self.zoneDropdown, 120)
     UIDropDownMenu_Initialize(self.zoneDropdown, function(_, level)
         local zones, choices = {}, {{value = 0, text = "All zones"}}
         for _, entry in ipairs(Addon.Activity:GetAll()) do
@@ -54,17 +63,39 @@ function UI:Create(parent)
         end
     end)
     UIDropDownMenu_SetText(self.zoneDropdown, "All zones")
+    if Addon.Activity.unavailable then
+        self.search:Disable()
+        if UIDropDownMenu_DisableDropDown then
+            UIDropDownMenu_DisableDropDown(self.statusDropdown)
+            UIDropDownMenu_DisableDropDown(self.zoneDropdown)
+        end
+    end
     local scroll = CreateFrame("ScrollFrame", nil, self.panel, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 8, -140); scroll:SetPoint("BOTTOMRIGHT", -28, 8)
+    scroll:SetPoint("TOPLEFT", 8, -238); scroll:SetPoint("BOTTOMRIGHT", -28, 8)
     self.content = CreateFrame("Frame", nil, scroll); self.content:SetSize(480, 380); scroll:SetScrollChild(self.content)
+    self.panel:RegisterEvent("PLAYER_FLAGS_CHANGED")
+    self.panel:SetScript("OnEvent", function() self:RefreshMyStatus() end)
     self:Refresh(); return self.panel
+end
+function UI:RefreshMyStatus()
+    if not self.myStatus or not self.panel:IsShown() then return end
+    local availability = Addon.Activity:Availability()
+    local status = availability ~= "NORMAL" and availability or Addon.Profile:GetField("status")
+    self.myStatus:SetText("My RP Status: " .. (status == "LFRP" and "LF RP" or status))
+    local settings = Addon.Database:GetActivitySettings()
+    self.listingStatus:SetText(Addon.Activity.unavailable and "Directory paused for Phase 1; no listings are advertised."
+        or not Addon.Activity:Enabled() and "Not advertising: networking is disabled or paused."
+        or status == "DND" and "Not listed: DND hides your Directory listing."
+        or not settings.directory and "Not listed: Directory Participation is OFF. Browsing is available."
+        or "Status used for advertising; delivery is not confirmed.")
 end
 function UI:CreateRow(index)
     local row = CreateFrame("Frame", nil, self.content)
-    row:SetSize(480, 62); row:SetPoint("TOPLEFT", 0, -(index - 1) * 64)
+    row:SetSize(480, 80); row:SetPoint("TOPLEFT", 0, -(index - 1) * 82)
     row.identity = Label(row, "", 8, -4, 340)
     row.location = Label(row, "", 8, -24, 340)
     row.detail = Label(row, "", 8, -43, 340)
+    row.layerID = Label(row, "", 8, -60, 340)
     row.request = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     row.request:SetSize(120, 24); row.request:SetPoint("RIGHT", -8, 0)
     row.request:SetScript("OnClick", function()
@@ -76,12 +107,29 @@ function UI:CreateRow(index)
     end)
     self.rows[index] = row; return row
 end
+function UI:RefreshLayerRow(row, entry)
+    local status = entry.availability ~= "NORMAL" and entry.availability or entry.status == "LFRP" and "LF RP" or entry.status
+    local evidence = Addon.LayerEvidence
+    local comparison = evidence and evidence:Compare(entry) or "UNKNOWN"
+    local labels = {SAME = "Same layer — inferred", DIFFERENT = "Different layer — inferred", UNKNOWN = "Layer unknown"}
+    row.detail:SetText(status .. " | " .. labels[comparison])
+    local remote = evidence and evidence:GetRemote(entry)
+    row.layerID:SetText(remote and ("Inferred ID: zone " .. remote.zone .. " / " .. remote.id) or "")
+end
+function UI:RefreshLayers()
+    if not self.panel or not self.panel:IsShown() then return end
+    for _, row in ipairs(self.rows) do
+        local entry = row:IsShown() and Addon.Activity:GetPeer(row.characterKey)
+        if entry then self:RefreshLayerRow(row, entry) end
+    end
+end
 function UI:Refresh()
     if not self.panel or not self.panel:IsShown() or not self.content then return end
+    self:RefreshMyStatus()
     for _, row in ipairs(self.rows) do row:Hide() end
     local blockers = Addon.Activity:GetNetworkingBlockers()
     self.status:SetText(#blockers == 0
-        and "Opt-in users, current zone first. Layer: Unknown. Region means continent.\nFilters use cached data only. Directory membership grants no profile access."
+        and "Opt-in users, current zone first. Layer estimates are experimental.\nFilters use cached data only. Directory membership grants no profile access."
         or table.concat(blockers, "\n"))
     local entries = Addon.Activity:Enabled() and Addon.Activity:QueryDirectory(self.filters) or {}
     for index, entry in ipairs(entries) do
@@ -91,8 +139,7 @@ function UI:Refresh()
         local location = entry.zone > 0 and MapName(entry.zone) or "Location hidden"
         if entry.subzone ~= "" then location = entry.subzone .. ", " .. location end
         row.location:SetText(Addon:EscapePlainText(location) .. " | " .. Addon:EscapePlainText(MapName(entry.region)))
-        local status = entry.availability ~= "NORMAL" and entry.availability or entry.status == "LFRP" and "LF RP" or entry.status
-        row.detail:SetText(status .. " | Layer unknown")
+        self:RefreshLayerRow(row, entry)
         local pending = Addon.ProfileTransfer:IsRequestPending(entry.characterKey, false)
         local cached = Addon.RemoteProfiles:HasProfile(entry.characterKey, false)
         local reachable = Addon.Presence:IsConfirmed(entry.characterKey, false) and Addon.Communication:CanBroadcast()
@@ -101,5 +148,5 @@ function UI:Refresh()
         row.request:SetEnabled(cached or reachable and not pending)
         row:Show()
     end
-    self.content:SetHeight(math.max(380, #entries * 64))
+    self.content:SetHeight(math.max(380, #entries * 82))
 end

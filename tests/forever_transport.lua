@@ -58,10 +58,10 @@ end)
 
 Test("shared library negotiation upgrades v24 and does not replace newer owners", function()
     local f = Fixture(16001, "%s %s", 24)
-    Check(f.internal.VERSION, 25); Check(f.internal.ForeverNameCompatibility, true)
+    Check(f.internal.VERSION, 26); Check(f.internal.ForeverNameCompatibility, true)
     Check(LibStub:NewLibrary("Chomp", 24), nil)
-    f = Fixture(16001, "%s %s", 26)
-    Check(f.internal.VERSION, 26); Check(f.internal.ForeverNameCompatibility, nil)
+    f = Fixture(16001, "%s %s", 27)
+    Check(f.internal.VERSION, 27); Check(f.internal.ForeverNameCompatibility, nil)
     Check(f.chomp.NameMergedRealm, nil); Check(f.chomp.sentinel, true)
 end)
 
@@ -77,7 +77,7 @@ Test("other clients retain upstream display/parser behavior and duplicate-realm 
 end)
 
 Test("real LibMSP initialization and requests use Chomp keys and API-bound addresses", function()
-    local f = Fixture(); f:LoadMSP(); Check(msp.version, 32)
+    local f = Fixture(); f:LoadMSP(); Check(msp.version, 33)
     f:Account("Spencer Raven", "ClassicBetaPvE2", 11)
     f:Login(); msp.eventFrame.scripts.OnEvent(msp.eventFrame, "PLAYER_LOGIN")
     f.now = f.now + 10
@@ -186,10 +186,107 @@ Test("secure MSP hooks capture post-Ambiguate targets without inventing send suc
     Check(entry.recipient, f.sent[#f.sent].target)
     Check(entry.accepted, nil)
     Check(entry.reason, "result-not-exposed-by-hook")
-    Check(entry.source, "shared-MSP2:Chomp/CTL-after-Ambiguate")
+    Check(entry.source, "shared-MSP2:API-bound")
     Check(msp:Request("Spencer Raven-ClassicBetaPvE2"), true)
     entry = ForeverRP.DiscoveryDiagnostics.whispers[#ForeverRP.DiscoveryDiagnostics.whispers]
     Check(entry.api, "BNSendGameData"); Check(entry.recipient, "11"); Check(entry.accepted, nil)
+end)
+
+Test("observed MSP uses raw multiword recipients through the real library queue", function()
+    for _, raw in ipairs({"Asty Pally", "Spencer Raven", "Single", "Cheese Spy-ClassicBetaPvE2"}) do
+        local lib = Fixture(); lib:LoadMSP(); lib:Login()
+        msp.eventFrame.scripts.OnEvent(msp.eventFrame, "PLAYER_LOGIN")
+        local f = dofile("tests/helpers/client_fixture.lua")()
+        f.realm = "ClassicBetaPvE"
+        dofile("ForeverRP/Discovery/Range.lua")
+        dofile("ForeverRP/Discovery/PlayerDetection.lua")
+        dofile("ForeverRP/Discovery/ObservedDiscovery.lua")
+        dofile("ForeverRP/Discovery/MSPCompatibility.lua")
+        local present = true
+        UnitExists = function(unit) return unit == "player" or present end
+        UnitFullName = function(unit)
+            if unit == "player" then return "Local", f.realm end
+            if raw:find("-", 1, true) then return "Cheese Spy", "ClassicBetaPvE2" end
+            return raw:match("^(%S+) (.+)$") or raw, raw:match("^%S+ (.+)$")
+        end
+        GetUnitName = function(unit) return unit == "player" and "Local-" .. f.realm or raw end
+        -- A deliberately destructive Ambiguate proves the raw path never
+        -- round-trips the observed transport string through library lookup keys.
+        Ambiguate = function() return "WRONG-ADDRESS" end
+        CheckInteractDistance = function() return true end
+        Check(ForeverRP.PlayerDetection:DetectUnit("mouseover", "mouseover"), true)
+        Check(#f.sent, 1); Check(f.sent[1].prefix, "FOREVERRP"); Check(f.sent[1].target, raw)
+        f.now = f.now + 1; lib.internal:RunQueue()
+        Check(#f.sent, 2); Check(f.sent[2].prefix, "MSP2"); Check(f.sent[2].target, raw)
+        Check(f.sent[2].payload:sub(13, 15), "?TT")
+        local key = ForeverRP.PlayerDetection.units.mouseover.characterKey
+        Check(ForeverRP.Presence:Get(key, false), nil)
+        Check(ForeverRP.NearbyPlayers:IsNearby(key, false), false)
+        -- No reply is normal: one bounded HELLO retry, no MSP retry storm.
+        f.now = f.now + 12; ForeverRP.ObservedDiscovery:Tick(); lib.internal:RunQueue()
+        Check(#f.sent, 3); Check(f.sent[3].target, raw)
+        f.now = f.now + 100; ForeverRP.ObservedDiscovery:Tick(); lib.internal:RunQueue()
+        Check(#f.sent, 3); Check(ForeverRP.Presence:Get(key, false), nil)
+    end
+end)
+
+Test("queued observed MSP cancels disappearing, reused, changed-recipient and private units", function()
+    for _, change in ipairs({"disappear", "remove", "reuse", "recipient", "hidden", "disabled", "expire"}) do
+        local lib = Fixture(); lib:LoadMSP(); lib:Login()
+        msp.eventFrame.scripts.OnEvent(msp.eventFrame, "PLAYER_LOGIN")
+        local f = dofile("tests/helpers/client_fixture.lua")(); f.realm = "ClassicBetaPvE"
+        ForeverRP.Database:SetDebugEnabled(true)
+        dofile("ForeverRP/Core/DiscoveryDiagnostics.lua")
+        dofile("ForeverRP/Discovery/PlayerDetection.lua")
+        dofile("ForeverRP/Discovery/MSPCompatibility.lua")
+        local exists, combined = true, "Asty Pally"
+        UnitExists = function() return exists end
+        UnitFullName = function(unit) if unit == "player" then return "Local", f.realm end; return "Asty", "Pally" end
+        GetUnitName = function(unit) return unit == "player" and "Local-" .. f.realm or combined end
+        Check(ForeverRP.PlayerDetection:DetectUnit("target", "target"), true)
+        Check(lib.internal.observedPending, 1); Check(#f.sent, 0)
+        if change == "disappear" then exists = false
+        elseif change == "remove" then ForeverRP.PlayerDetection:RemoveUnit("target")
+        elseif change == "reuse" then UnitFullName = function() return "Other", "Person" end; combined = "Other Person"
+        elseif change == "recipient" then combined = "Asty Pally-ClassicBetaPvE"
+        elseif change == "hidden" then ForeverRP.Database:SetPrivacyMode("hidden")
+        elseif change == "disabled" then ForeverRP.Database:SetDiscoveryEnabled(false)
+        else f.now = f.now + 5 end
+        f.now = f.now + 1; lib.internal:RunQueue()
+        Check(#f.sent, 0); Check(lib.internal.observedPending, 0)
+        Check(ForeverRP.DiscoveryDiagnostics.whispers[1].reason, "stale-observation")
+    end
+end)
+
+Test("guarded sends expose real boolean/enum results without retrying failures", function()
+    for _, result in ipairs({true, false, 0, 1, 3, 8}) do
+        local f = Fixture(); f:LoadMSP(); f:Login()
+        msp.eventFrame.scripts.OnEvent(msp.eventFrame, "PLAYER_LOGIN")
+        local calls, observed = 0, nil
+        C_ChatInfo.SendAddonMessage = function(_, _, _, recipient)
+            calls = calls + 1; Check(recipient, "Asty Pally"); return result
+        end
+        Check(msp:RequestObserved("Asty Pally-ClassicBetaPvE", "Asty Pally", function() return true end,
+            function(value, reason) observed = value; Check(reason, "sent") end), true)
+        f.now = f.now + 1; f.internal:RunQueue()
+        Check(observed, result); Check(calls, 1); Check(f.internal.observedPending, 0)
+        f.now = f.now + 1; f.internal:RunQueue(); Check(calls, 1)
+    end
+end)
+
+Test("guarded probes stay bounded and do not use an external noncancellable CTL queue", function()
+    local f = Fixture(); f:LoadMSP(); f:Login()
+    msp.eventFrame.scripts.OnEvent(msp.eventFrame, "PLAYER_LOGIN")
+    local external = 0
+    ChatThrottleLib = {SendAddonMessage = function() external = external + 1 end}
+    f.internal.ChatThrottleLib = true
+    for i = 1, 33 do
+        Check(f.chomp.SendObservedMSPRequest("?TT", "Peer " .. i, function() return true end), i <= 32)
+    end
+    Check(f.internal.observedPending, 32)
+    f.now = f.now + 3; f.internal:RunQueue(); Check(external, 0); Check(#f.sent, 32)
+    Check(f.internal.observedPending, 0)
+    f = Fixture(120000, "%s-%s"); Check(f.chomp.SendObservedMSPRequest, nil)
 end)
 
 print(string.format("PASS: %d Forever library/transport cases; %d checks (mocked client only)", cases, checks))

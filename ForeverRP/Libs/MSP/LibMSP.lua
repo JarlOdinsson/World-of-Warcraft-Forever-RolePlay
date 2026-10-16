@@ -31,7 +31,8 @@
 	- For more information, see documentation on the Mary Sue Protocol - http://moonshyne.org/msp/
 ]]
 
-local VERSION = 32
+local _, _, _, clientInterface = GetBuildInfo()
+local VERSION = clientInterface == 16001 and 33 or 32
 local PROTOCOL_VERSION = 3
 local CHOMP_VERSION = 20
 
@@ -751,7 +752,7 @@ function msp:QueueRequest(name, field)
 	end
 end
 
-function msp:Request(name, fields)
+local function Request(self, name, fields, observedSend)
 	name = AddOn_Chomp.NameMergedRealm(name)
 	if name == PLAYER_NAME or name:match("^([^%-]+)") == UNKNOWNOBJECT then
 		return false
@@ -789,10 +790,25 @@ function msp:Request(name, fields)
 		end
 	end
 	if #toSend > 0 then
-		Send(name, toSend, "UNSAFE", "REQUEST")
+        if observedSend then
+            return observedSend(table.concat(toSend, SEPARATOR))
+        end
+        Send(name, toSend, "UNSAFE", "REQUEST")
 		return true
 	end
 	return false
+end
+
+function msp:Request(name, fields)
+    return Request(self, name, fields)
+end
+
+if clientInterface == 16001 and AddOn_Chomp.SendObservedMSPRequest then
+    function msp:RequestObserved(name, recipient, validate, report)
+        return Request(self, name, nil, function(payload)
+            return AddOn_Chomp.SendObservedMSPRequest(payload, recipient, validate, report)
+        end)
+    end
 end
 
 function msp:Send(name, chunks)

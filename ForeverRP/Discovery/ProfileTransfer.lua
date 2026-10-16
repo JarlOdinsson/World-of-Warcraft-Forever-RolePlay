@@ -15,6 +15,12 @@ local function Now()
     return GetTime and GetTime() or 0
 end
 
+local function Trace(stage, peer, id, reason, recipient, index, total)
+    if Addon.DiscoveryDiagnostics and Addon.DiscoveryDiagnostics.RecordProfile then
+        Addon.DiscoveryDiagnostics:RecordProfile(stage, peer, id, reason, recipient, index, total)
+    end
+end
+
 local function TransferKey(characterKey, messageId)
     return string.lower(characterKey) .. "\031" .. messageId
 end
@@ -104,11 +110,13 @@ function Addon.ProfileTransfer:ProcessResponseQueue()
         return false
     end
     if response.expiresAt and Now() >= response.expiresAt then
+        Trace("response-cancel", response.characterKey, response.messageId, "expired", response.transportRecipient)
         self:RemoveResponse(responseKey)
         if Addon.ProfileAuthorization then Addon.ProfileAuthorization:Status(response.characterKey, response.messageId, "busy") end
         return self:ProcessResponseQueue()
     end
     if not self:CanRespondTo(response.characterKey, response.messageId) then
+        Trace("response-cancel", response.characterKey, response.messageId, "privacy-or-disclosure", response.transportRecipient)
         self:RemoveResponse(responseKey)
         return self:ProcessResponseQueue()
     end
@@ -116,9 +124,13 @@ function Addon.ProfileTransfer:ProcessResponseQueue()
     local payload = Addon.Communication:Serialize(
         "PROFILE_DATA", response.messageId, response.nextChunk, #response.chunks, response.chunks[response.nextChunk]
     )
-    local accepted = payload and Addon.Communication:SendPayload(payload, "WHISPER",
-        response.transportRecipient, "PROFILE_DATA", response.characterKey,
-        response.recipientSource)
+    local accepted, sendReason
+    if payload then
+        accepted, sendReason = Addon.Communication:SendPayload(payload, "WHISPER",
+            response.transportRecipient, "PROFILE_DATA", response.characterKey, response.recipientSource)
+    end
+    Trace(accepted and "chunk-send" or "chunk-send-failed", response.characterKey, response.messageId,
+        sendReason or "serialization-failed", response.transportRecipient, response.nextChunk, #response.chunks)
     if accepted then
         if Addon.ProfileAuthorization then Addon.ProfileAuthorization:MarkServed(response.characterKey, response.transportRecipient) end
         response.nextChunk = response.nextChunk + 1
@@ -217,25 +229,29 @@ function Addon.ProfileTransfer:BuildChunks(encoded)
 end
 
 function Addon.ProfileTransfer:SendProfile(characterKey, messageId, recipient)
+    local function Reject(reason)
+        Trace("response-reject", characterKey, messageId, reason, recipient)
+        return false, reason
+    end
     if not self:CanRespondTo(characterKey, messageId) then
-        return false, "privacy"
+        return Reject("privacy")
     end
     local peer = PeerKey(characterKey)
     local responseKey = TransferKey(characterKey, messageId)
     if self.outgoingResponses[responseKey] or self.outgoingResponsePeers[peer] then
-        return false, "duplicate"
+        return Reject("duplicate")
     end
     local cooldown = self.responseCooldowns[peer]
     if cooldown and Now() - cooldown < (Addon.Constants.PROFILE_RESPONSE_PEER_COOLDOWN_SECONDS or 10) then
-        return false, "cooldown"
+        return Reject("cooldown")
     end
     if #self.outgoingResponseOrder >= (Addon.Constants.PROFILE_RESPONSE_QUEUE_MAX or 8) then
-        return false, "busy"
+        return Reject("busy")
     end
     local encoded = self:SerializeProfile(Addon.Profile:Get())
     local chunks = encoded and self:BuildChunks(encoded)
     if not chunks then
-        return false, "profile"
+        return Reject("profile")
     end
     -- Admit only work that can complete inside the existing client's timeout.
     local queuedChunks = #chunks
@@ -243,7 +259,7 @@ function Addon.ProfileTransfer:SendProfile(characterKey, messageId, recipient)
         queuedChunks = queuedChunks + #queued.chunks - queued.nextChunk + 1
     end
     local delay = Addon.Constants.PROFILE_RESPONSE_CHUNK_DELAY_SECONDS or 0.1
-    if queuedChunks * delay > Addon.Constants.PROFILE_TRANSFER_TIMEOUT - 3 then return false, "busy" end
+    if queuedChunks * delay > Addon.Constants.PROFILE_TRANSFER_TIMEOUT - 3 then return Reject("busy") end
 
     self.outgoingResponses[responseKey] = {
         characterKey = characterKey,
@@ -258,6 +274,7 @@ function Addon.ProfileTransfer:SendProfile(characterKey, messageId, recipient)
     self.outgoingResponseOrder[#self.outgoingResponseOrder + 1] = responseKey
     self.outgoingResponsePeers[peer] = responseKey
     self.responseCooldowns[peer] = Now()
+    Trace("response-queued", characterKey, messageId, "accepted", self.outgoingResponses[responseKey].transportRecipient, 1, #chunks)
     self:ScheduleResponsePump(0)
     return true
 end
@@ -265,27 +282,39 @@ end
 function Addon.ProfileTransfer:Request(value)
     local characterKey = Addon.Presence:ResolveKnownKey(value, false)
     if not characterKey or Addon.Presence:IsSelf(characterKey) then
+        Trace("request-reject", value, nil, "unknown-or-self")
         return false, "unknown"
     end
     if self:IsRequestPending(characterKey, false) then
+        Trace("request-reject", characterKey, nil, "pending")
         return false, "pending"
     end
     local pendingCount = 0
     for _ in pairs(self.pendingRequests) do pendingCount = pendingCount + 1 end
     if pendingCount >= (Addon.Constants.PROFILE_MAX_PENDING_REQUESTS or 20) then
+        Trace("request-reject", characterKey, nil, "busy")
         return false, "busy"
     end
 
     local messageId = self:CreateMessageId()
     local payload = Addon.Communication:Serialize("PROFILE_REQUEST", messageId)
-    if not payload or not Addon.Communication:SendPayload(payload, "WHISPER",
-        TransportRecipient(characterKey), "PROFILE_REQUEST", characterKey, RecipientSource(characterKey)) then
+    local recipient = TransportRecipient(characterKey)
+    local accepted, sendReason
+    if payload then
+        accepted, sendReason = Addon.Communication:SendPayload(payload, "WHISPER",
+            recipient, "PROFILE_REQUEST", characterKey, RecipientSource(characterKey))
+    end
+    Trace("request-send", characterKey, messageId, sendReason or "serialization-failed", recipient)
+    if not accepted then
         return false, "send"
     end
     self.pendingRequests[TransferKey(characterKey, messageId)] = {
         createdAt = Now(),
         simulated = false,
+        characterKey = characterKey,
+        messageId = messageId,
     }
+    Trace("request-pending", characterKey, messageId, "awaiting-response", recipient)
     return true, characterKey
 end
 
@@ -300,6 +329,7 @@ function Addon.ProfileTransfer:HandleRequest(packet, sender, characterKey, simul
 end
 
 function Addon.ProfileTransfer:HandleStatus(packet, characterKey)
+    Trace("status", characterKey, packet.messageId, packet.status)
     if packet.status == "revoked" then
         Addon.RemoteProfiles:ClearProfile(characterKey)
         for key in pairs(self.pendingRequests) do
@@ -339,6 +369,7 @@ function Addon.ProfileTransfer:CleanupExpired()
     end
     for transferKey, request in pairs(self.pendingRequests) do
         if request.createdAt < cutoff then
+            Trace("request-expired", request.characterKey, request.messageId, "timeout")
             self.pendingRequests[transferKey] = nil
             expired = true
         end
@@ -390,6 +421,7 @@ function Addon.ProfileTransfer:HandleChunk(packet, characterKey, simulated)
     local transferKey = TransferKey(characterKey, packet.messageId)
     local request = self.pendingRequests[transferKey]
     if not request or request.simulated ~= (simulated == true) then
+        Trace("chunk-reject", characterKey, packet.messageId, "no-matching-request", nil, packet.chunkIndex, packet.totalChunks)
         return false
     end
     local transfer = self.incoming[transferKey]
@@ -407,6 +439,7 @@ function Addon.ProfileTransfer:HandleChunk(packet, characterKey, simulated)
         }
         self.incoming[transferKey] = transfer
     elseif transfer.totalChunks ~= packet.totalChunks or transfer.simulated ~= (simulated == true) then
+        Trace("chunk-reject", characterKey, packet.messageId, "transfer-mismatch", nil, packet.chunkIndex, packet.totalChunks)
         self.incoming[transferKey] = nil
         return false
     end
@@ -414,6 +447,7 @@ function Addon.ProfileTransfer:HandleChunk(packet, characterKey, simulated)
     local existing = transfer.chunks[packet.chunkIndex]
     if existing then
         if existing ~= packet.chunk then
+            Trace("chunk-reject", characterKey, packet.messageId, "conflicting-duplicate", nil, packet.chunkIndex, packet.totalChunks)
             self.incoming[transferKey] = nil
             return false
         end
@@ -422,11 +456,13 @@ function Addon.ProfileTransfer:HandleChunk(packet, characterKey, simulated)
 
     transfer.receivedBytes = transfer.receivedBytes + #packet.chunk
     if transfer.receivedBytes > Addon.Constants.MAX_PROFILE_ENCODED_BYTES then
+        Trace("chunk-reject", characterKey, packet.messageId, "oversized", nil, packet.chunkIndex, packet.totalChunks)
         self.incoming[transferKey] = nil
         return false
     end
     transfer.chunks[packet.chunkIndex] = packet.chunk
     transfer.receivedChunks = transfer.receivedChunks + 1
+    Trace("chunk-accepted", characterKey, packet.messageId, "assembled=" .. transfer.receivedChunks, nil, packet.chunkIndex, packet.totalChunks)
     if transfer.receivedChunks < transfer.totalChunks then
         return true
     end
@@ -434,15 +470,17 @@ function Addon.ProfileTransfer:HandleChunk(packet, characterKey, simulated)
     local encoded = table.concat(transfer.chunks, "")
     self.incoming[transferKey] = nil
     self.pendingRequests[transferKey] = nil
-    local profile = self:DeserializeProfile(encoded)
+    local profile, decodeReason = self:DeserializeProfile(encoded)
     if not profile then
+        Trace("assembly-reject", characterKey, packet.messageId, decodeReason)
         Addon:Debug("Remote profile rejected from", characterKey)
         return false
     end
 
-    local stored = Addon.RemoteProfiles:StoreProfile(characterKey, profile, transfer)
+    local stored, storeReason = Addon.RemoteProfiles:StoreProfile(characterKey, profile, transfer)
+    Trace("cache", characterKey, packet.messageId, stored and "FRP-stored" or storeReason or "store-rejected")
     if stored and Addon.ProfileViewer then
-        Addon.ProfileViewer:ShowRemote(characterKey, simulated == true)
+        Addon.ProfileViewer:ShowRemote(characterKey, simulated == true, packet.messageId)
     end
     return stored
 end

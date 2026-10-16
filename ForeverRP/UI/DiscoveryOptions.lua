@@ -18,7 +18,7 @@ local function Button(parent, text, x, y, width, action)
     return button
 end
 
-function Options:Dropdown(parent, name, title, x, y, choices, get, set)
+function Options:Dropdown(parent, name, title, x, y, choices, get, set, unavailable)
     Text(parent, title, x, y, 240)
     local dropdown = CreateFrame("Frame", name, parent, "UIDropDownMenuTemplate")
     dropdown:SetPoint("TOPLEFT", x - 16, y - 18)
@@ -28,18 +28,21 @@ function Options:Dropdown(parent, name, title, x, y, choices, get, set)
             local value, label = choice[1], choice[2]
             local info = UIDropDownMenu_CreateInfo()
             info.text, info.value, info.checked = label, value, get() == value
-            info.func = function() set(value); self:Refresh() end
+            info.disabled = unavailable == true
+            info.func = function() if not unavailable then set(value); self:Refresh() end end
             UIDropDownMenu_AddButton(info, level)
         end
     end)
     self.dropdowns[#self.dropdowns + 1] = {widget = dropdown, choices = choices, get = get}
+    if unavailable and UIDropDownMenu_DisableDropDown then UIDropDownMenu_DisableDropDown(dropdown) end
 end
 
 function Options:Create(parent)
+    local paused = Addon.Activity.unavailable
     local panel = CreateFrame("Frame", nil, parent)
     panel:SetAllPoints()
     self.panel = panel
-    Text(panel, "Discovery & Privacy", 20, -20)
+    Text(panel, "Privacy & Sharing", 20, -20)
     local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 8, -45)
     scroll:SetPoint("BOTTOMRIGHT", -28, 8)
@@ -47,7 +50,7 @@ function Options:Create(parent)
     content:SetSize(480, 900)
     scroll:SetScrollChild(content)
     self.content = content
-    self:Dropdown(content, "ForeverRPDisclosureDropdown", "Full-profile disclosure", 12, -5,
+    self:Dropdown(content, "ForeverRPDisclosureDropdown", "Profile permissions (full profile)", 12, -5,
         {{"public", "Public"}, {"approval", "Approval Required"}, {"connections", "Connections Only"}},
         function() return Addon.Database:GetDisclosureMode() end,
         function(value) Addon.Database:SetDisclosureMode(value) end)
@@ -56,9 +59,11 @@ function Options:Create(parent)
     self:Dropdown(content, "ForeverRPLocationDropdown", "Location sharing (experimental network only)", 12, -130,
         {{"hidden", "Don't share my location"}, {"zone", "Share zone only"}, {"precise", "Share precise location"}},
         function() return Addon.Database:GetActivitySettings().location end,
-        function(value) Addon.Database:SetActivitySetting("location", value) end)
-    Text(content, "Withholding location still allows browsing when networking is enabled.\nHidden Discovery Visibility disables networking and location sharing.\nLayer: Unknown; coordinates do not prove a shared layer.", 12, -185, 460)
+        function(value) Addon.Database:SetActivitySetting("location", value) end, paused)
+    Text(content, paused and "Location sharing is paused for Phase 1.\nNo coordinates are sent. Saved preferences are retained.\nLayer remains unknown."
+        or "Withholding location still allows browsing when networking is enabled.\nHidden Discovery Visibility disables networking and location sharing.\nLayer estimates use fresh NPC evidence, not coordinates.", 12, -185, 460)
     self.experimental = Button(content, "", 12, -230, 230, function()
+        if Addon.Activity.unavailable then return end
         Addon.Database:SetActivitySetting("enabled", not Addon.Database:GetActivitySettings().enabled)
         self:Refresh()
     end)
@@ -66,18 +71,22 @@ function Options:Create(parent)
         Addon.Database:SetActivitySetting("markers", not Addon.Database:GetActivitySettings().markers)
         self:Refresh()
     end)
-    Text(content, "Experimental networking defaults OFF. Cross-layer delivery is unverified.\nMarkers are neutral and never open or request profiles.", 12, -260, 460)
+    Text(content, paused and "Dots use nearby units only when safe positions are available.\nDots never open or request profiles; no layer is inferred."
+        or "Experimental networking defaults OFF. Cross-layer delivery is unverified.\nMarkers are neutral and never open or request profiles.", 12, -260, 460)
     self.networkStatus = Text(content, "", 12, -290, 460)
     Button(content, "RP Directory", 12, -320, 150, function() Addon.UI:ShowPanel("activity") end)
     self.directory = Button(content, "", 170, -320, 230, function()
+        if Addon.Activity.unavailable then return end
         Addon.Database:SetActivitySetting("directory", not Addon.Database:GetActivitySettings().directory)
         self:Refresh()
     end)
     self.subzone = Button(content, "", 12, -355, 230, function()
+        if Addon.Activity.unavailable then return end
         Addon.Database:SetActivitySetting("subzone", not Addon.Database:GetActivitySettings().subzone)
         self:Refresh()
     end)
-    Text(content, "Directory Participation lists your character; OFF still allows browsing.\nDon't share my location omits zone, region and subzone; DND is never listed.\nDirectory listing grants no full-profile access and is separate from Nearby.", 12, -390, 460)
+    Text(content, paused and "Directory, subzone sharing and layer estimates are paused.\nUse Nearby for locally observed ForeverRP users.\nProfile permissions and approvals below remain available."
+        or "Directory Participation lists your character; OFF still allows browsing.\nDon't share my location omits zone, region and subzone; DND is never listed.\nDirectory listing grants no full-profile access and is separate from Nearby.", 12, -390, 460)
     Text(content, "Pending requests (expire after 25 seconds)", 12, -435)
     Text(content, "Explicit Connections approvals — these apply only to this character's profile", 12, -750)
     self:Refresh()
@@ -101,6 +110,14 @@ function Options:Refresh()
     self.markers:SetText(settings.markers and "Minimap Markers: ON" or "Minimap Markers: OFF")
     self.directory:SetText(settings.directory and "Directory Participation: ON" or "Directory Participation: OFF")
     self.subzone:SetText(settings.subzone and "Share Subzone: ON" or "Share Subzone: OFF")
+    if Addon.Activity.unavailable then
+        self.experimental:SetText("Network: Paused for Phase 1")
+        self.directory:SetText("Directory: Paused for Phase 1")
+        self.subzone:SetText("Subzone: Paused for Phase 1")
+        self.experimental:SetEnabled(false)
+        self.directory:SetEnabled(false)
+        self.subzone:SetEnabled(false)
+    end
     for _, row in ipairs(self.rows) do row.frame:Hide() end
     local index = 0
     local function Row(peer, y, primary, action, deny)

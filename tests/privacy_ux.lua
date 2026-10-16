@@ -8,7 +8,8 @@ local f = Fixture()
 local a, db = ForeverRP, ForeverRP.Database
 local widgets = {}
 local Widget = {}; Widget.__index = Widget
-for _, method in ipairs({"SetJustifyH", "SetAllPoints", "SetScrollChild", "SetHeight", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "ClearAllPoints"}) do Widget[method] = function() end end
+for _, method in ipairs({"SetJustifyH", "SetAllPoints", "SetScrollChild", "SetHeight", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "ClearAllPoints", "SetColorTexture", "SetMultiLine", "SetFontObject", "SetTextInsets"}) do Widget[method] = function() end end
+function Widget:RegisterEvent(event) self.registeredEvent = event end
 function Widget:SetWidth(w) self.width = w end
 function Widget:SetSize(w, h) self.width, self.height = w, h end
 function Widget:SetPoint(_, x, y) self.x, self.y = x, y end
@@ -22,6 +23,7 @@ function Widget:SetShown(value) self.shown = value end
 function Widget:SetEnabled(value) self.enabled = value end
 local function New(kind) local w = setmetatable({kind = kind}, Widget); widgets[#widgets + 1] = w; return w end
 function Widget:CreateFontString() return New("text") end
+function Widget:CreateTexture() return New("texture") end
 CreateFrame = function(kind) return New(kind) end
 UIDropDownMenu_SetWidth = function(widget, width) widget.width = width end
 UIDropDownMenu_Initialize = function(widget, run) widget.initialize = run end
@@ -115,4 +117,65 @@ for _, w in ipairs(widgets) do
         if w.y == -390 then Check(lines * 12 <= 45, true) end
     end
 end
+-- One editor controls the advertised profile status; Directory filters never write it.
+db:SetDiscoveryEnabled(true); db:SetPrivacyMode("visible", true); db:SetActivitySetting("enabled", true)
+directory:Refresh()
+Check(directory.listingStatus.text, "Not listed: Directory Participation is OFF. Browsing is available.")
+dofile("ForeverRP/Localization/enUS.lua")
+a.GetText = function(_, key) return a.Localization.enUS[key] or key end
+StaticPopupDialogs = {}
+dofile("ForeverRP/Profile/ProfileEditor.lua")
+local editor = a.ProfileEditor
+editor:Create({})
+local labels = {}
+for _, widget in ipairs(widgets) do
+    if widget.kind == "text" then labels[widget.text or ""] = true end
+end
+Check(labels["My RP Status"], true)
+Check(labels["Directory Filters: Show players with these statuses."], true)
+Check(labels["Only changes your list, not your advertised status."], true)
+Check(labels["Privacy & Sharing"], true)
+Check(labels["Profile permissions (full profile)"], true)
+local choices = {}
+UIDropDownMenu_AddButton = function(info) choices[#choices + 1] = info end
+editor.statusDropdown.initialize(nil, 1)
+Check(#choices, 5)
+local beforeSends, beforeMode, beforeLocation = #f.sent, db:GetPrivacyMode(), db:GetActivitySettings().location
+for index, status in ipairs({"IC", "LFRP", "OOC", "AFK", "DND"}) do
+    choices[index].func()
+    directory:Refresh()
+    Check(a.Profile:GetField("status"), status)
+    Check(directory.myStatus.text, "My RP Status: " .. (status == "LFRP" and "LF RP" or status))
+    Check(editor.statusDropdown.text, choices[index].text)
+end
+Check(directory.listingStatus.text, "Not listed: DND hides your Directory listing.")
+choices[1].func(); f.afk = true
+directory.panel.OnEvent(directory.panel, "PLAYER_FLAGS_CHANGED", "player")
+Check(directory.myStatus.text, "My RP Status: AFK")
+f.dnd = true; directory.panel.OnEvent(directory.panel, "PLAYER_FLAGS_CHANGED", "player")
+Check(directory.myStatus.text, "My RP Status: DND")
+f.afk, f.dnd = false, false
+directory.panel.OnEvent(directory.panel, "PLAYER_FLAGS_CHANGED", "player")
+Check(directory.myStatus.text, "My RP Status: IC")
+Check(directory.panel.registeredEvent, "PLAYER_FLAGS_CHANGED")
+choices = {}; directory.statusDropdown.initialize(nil, 1)
+local payload = a.Activity:Payload()
+for _, choice in ipairs(choices) do
+    choice.func()
+    Check(a.Profile:GetField("status"), "IC")
+    Check(a.Activity:Payload(), payload)
+end
+Check(#f.sent, beforeSends); Check(db:GetPrivacyMode(), beforeMode)
+Check(db:GetActivitySettings().location, beforeLocation); Check(db:GetActivitySettings().directory, false)
+a.UI.panels.profile = editor.panel
+directory.editStatus.OnClick(); Check(a.UI.currentPanel, "profile")
+a.UI:ShowPanel("activity"); Check(directory.myStatus.text, "My RP Status: IC")
+db:SetActivitySetting("directory", true)
+Check(directory.listingStatus.text, "Status used for advertising; delivery is not confirmed.")
+db:SetPrivacyMode("hidden", true)
+Check(directory.listingStatus.text, "Not advertising: networking is disabled or paused.")
+for _, text in ipairs({directory.myStatus, directory.listingStatus}) do
+    Check(#text.text * 6 <= text.width, true)
+end
+Check(#directory.editStatus.text * 6 <= directory.editStatus.width - 16, true)
 print("PASS: privacy UX; " .. checks .. " checks (mock layout only)")

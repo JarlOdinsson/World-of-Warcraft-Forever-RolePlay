@@ -125,7 +125,7 @@ Test("experimental discovery stays off until opt-in and never guesses a layer", 
     Check(#f.sent, 1); Check(f.joined, 1)
     Check(f.sent[1].prefix, "FOREVERRPX1")
     Check(f.sent[1].channel, "CHANNEL")
-    Check(f.sent[1].payload:match("^A2|") ~= nil, true)
+    Check(f.sent[1].payload:match("^A3|") ~= nil, true)
     Check(activity:Receive("A1|0.1.1-beta.7|0|public|10|-|-|-", "GUILD", "Peer-Realm"), true)
     Check(activity:GetPeer("Peer-Realm").layer, "UNKNOWN")
     Check(ForeverRP.Presence:IsConfirmed("Peer-Realm", false), true)
@@ -184,7 +184,7 @@ Test("bounded channel load and repeated events cannot create announcement storms
         f.x = 100 + second
         for _ = 1, 10 do activity:Changed(); activity:Tick() end
     end
-    Check(#f.sent <= 21, true)
+    Check(#f.sent <= 42, true) -- one ordered snapshot plus one legacy advertisement per cycle
     local sent = #f.sent
     f.result = 3
     for second = 1, 100 do f.now = f.now + 1; activity:Tick() end

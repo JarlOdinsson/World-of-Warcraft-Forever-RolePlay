@@ -53,7 +53,7 @@ Detection without a shared party or guild depends on the client exposing an obse
 
 Range choices use conservative interaction-distance brackets rather than exact yard measurements. The 20- and 25-yard settings use the available closer bracket conservatively. Real interaction checks run only when the client explicitly reports combat lockdown inactive. During lockdown, or when combat/range evidence is unavailable or restricted, range is Unknown and cannot qualify a player for Nearby. The normal ticker reevaluates after combat. Directory discovery is paused in Phase 1.
 
-Notifications can pulse the minimap icon, play a sound, and print an optional chat message. Choose **Bing Bong**, **Drumroll** (legacy ready-check sound), or **None**. New installations default to the bundled spoken Bing Bong; upgrades preserve the legacy sound and existing channel/enable settings. **Test Sound** previews the selected **Master** (default) or **Sound Effects** channel. ForeverRP does not change global volume or silently switch channels. A failed or unconfirmed preview reports a limitation; actual loudness and Master routing still require client testing. Preview clicks are rate-limited and do not consume discovery cooldowns.
+Notifications can pulse the minimap icon, play a sound, and print an optional chat message. Choose **Bing Bong**, **Fears to Fathom**, **GTA Menu**, **Steam Achievement**, **Navi Hey**, **Short Chime**, **BMW Bong**, **Success Chime**, **Magical Burst**, **Drumroll** (legacy ready-check sound), or **None**. New installations default to the bundled spoken Bing Bong; upgrades preserve the legacy sound and existing channel/enable settings. **Test Sound** previews the selected **Master** (default) or **Sound Effects** channel. ForeverRP does not change global volume or silently switch channels. A failed or unconfirmed preview reports a limitation; actual loudness and Master routing still require client testing. Preview clicks are rate-limited and do not consume discovery cooldowns.
 
 Automatic notifications retain the per-player cooldown (10 minutes by default). Changes between eligible range brackets do not trigger another entry alert. Presence expires after 15 minutes without renewal; eligible communications renew it conservatively.
 
@@ -135,6 +135,6 @@ Use [the Phase 1 two-player checklist](https://github.com/JarlOdinsson/World-of-
 
 ## License and support
 
-ForeverRP software is MIT-licensed. Embedded libraries retain their own licenses and notices under `ForeverRP/Libs/MSP` in the source repository (`Libs/MSP` inside the installed addon). The supplied Bing Bong recording has separate redistribution permission; see `Media/Sounds/NOTICE.md`. The software license does not license the recording.
+ForeverRP software is MIT-licensed. Embedded libraries retain their own licenses and notices under `ForeverRP/Libs/MSP` in the source repository (`Libs/MSP` inside the installed addon). Bundled audio has separate redistribution permissions and is not covered by the software license; see `Media/Sounds/NOTICE.md`.
 
 Report bugs at [GitHub Issues](https://github.com/JarlOdinsson/World-of-Warcraft-Forever-RolePlay/issues). Include your `/frp version` output, reproduction steps, privacy mode, and any Lua error. Do not include private notes or personal profile contents.

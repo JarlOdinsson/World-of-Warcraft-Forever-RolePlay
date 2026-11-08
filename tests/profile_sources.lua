@@ -115,12 +115,14 @@ do
     Check(f.opened, nil)
     Check(ForeverRP.MSPCompatibility:HasProfile(f.peer), false)
     Check(f:MSP(false), true)
+    Check(f.opened, nil)
+    Check(f.viewer:ShowMSP(f.peer), true)
     Check(f.viewer.remoteSource, "MSP")
     Check(f.viewer.rememberButton.shown, false)
     Check(ForeverRP.MSPCompatibility:HasProfile(f.peer:upper()), true)
     Check(ForeverRP.MSPCompatibility:HasProfile("Putrick Margrave-ClassicBetaPvE2"), false)
     cases = cases + 1
-    print("PASS empty MSP cannot open; meaningful MSP-only profiles still work")
+    print("PASS empty MSP cannot open; meaningful MSP-only profiles open on request")
 end
 
 for _, mode in ipairs({"absent", "disabled"}) do

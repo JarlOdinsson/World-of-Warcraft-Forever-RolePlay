@@ -58,8 +58,12 @@ function Addon.Notifications:PlayDiscoverySound(level)
     if channel ~= "SFX" then channel = "Master" end
     local play = PlaySound or (C_Sound and C_Sound.PlaySound)
     local asset = soundKit
-    if settings.soundChoice == "bingbong" then
-        play, asset = PlaySoundFile, "Interface\\AddOns\\ForeverRP\\Media\\Sounds\\nyc-bing-bong.mp3"
+    for _, sound in ipairs(Addon.Constants.NOTIFICATION_SOUND_CHOICES) do
+        if sound.value == settings.soundChoice and sound.file then
+            play = PlaySoundFile
+            asset = "Interface\\AddOns\\" .. Addon.Constants.ADDON_NAME .. "\\Media\\Sounds\\" .. sound.file
+            break
+        end
     end
     if play and asset then
         local ok, played, handle = pcall(play, asset, channel)

@@ -141,10 +141,9 @@ function Addon.UI:CreateSettingsPanel(parent)
     local soundChoiceDropdown = CreateFrame("Frame", "ForeverRPNotificationSoundDropdown", panel, "UIDropDownMenuTemplate")
     soundChoiceDropdown:SetPoint("TOPLEFT", soundChoiceLabel, "BOTTOMLEFT", -16, -3)
     UIDropDownMenu_SetWidth(soundChoiceDropdown, 190)
-    local choices = {{"bingbong", "Bing Bong"}, {"drumroll", "Drumroll (legacy)"}, {"none", "None"}}
     UIDropDownMenu_Initialize(soundChoiceDropdown, function(_, level)
-        for _, choice in ipairs(choices) do
-            local value, label = choice[1], choice[2]
+        for _, choice in ipairs(Addon.Constants.NOTIFICATION_SOUND_CHOICES) do
+            local value, label = choice.value, choice.label
             local info = UIDropDownMenu_CreateInfo()
             info.text, info.value = label, value
             info.checked = Addon.Database:GetNotificationSettings().soundChoice == value
@@ -269,7 +268,10 @@ function Addon.UI:RefreshSettings()
     UIDropDownMenu_SetSelectedValue(self.settingsPanel.soundChannelDropdown, notifications.soundChannel)
     UIDropDownMenu_SetText(self.settingsPanel.soundChannelDropdown,
         Addon:GetText("SETTINGS_SOUND_" .. string.upper(notifications.soundChannel)))
-    local soundLabels = {bingbong = "Bing Bong", drumroll = "Drumroll (legacy)", none = "None"}
+    local soundLabels = {}
+    for _, sound in ipairs(Addon.Constants.NOTIFICATION_SOUND_CHOICES) do
+        soundLabels[sound.value] = sound.label
+    end
     UIDropDownMenu_SetSelectedValue(self.settingsPanel.soundChoiceDropdown, notifications.soundChoice)
     UIDropDownMenu_SetText(self.settingsPanel.soundChoiceDropdown, soundLabels[notifications.soundChoice] or "Drumroll (legacy)")
     local emoteBar = Addon.EmoteBar:GetSettings()

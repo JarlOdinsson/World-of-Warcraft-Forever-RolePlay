@@ -38,7 +38,8 @@ local function Fixture()
         end,
     }
     ForeverRP.ProfileViewer = {ShowMSP = function(_, key) f.opened = key; return true end,
-        Refresh = function() end}
+        Refresh = function() end,
+        RefreshIfViewing = function(_, key) if f.viewing == key then f.refreshed = key end end}
     ForeverRP.RemoteProfiles = {HasProfile = function() return false end,
         StoreProfile = function() error("MSP must not write ForeverRP remote profiles") end}
     msp = {
@@ -106,7 +107,7 @@ Test("diagnostic toggle isolates integration, cancels queued validation and surv
     Check(ForeverRP.MSPCompatibility:OnReceived("Alice-Realm"), true)
 end)
 
-Test("received MSP data is validated, isolated, and opened in the existing viewer", function()
+Test("received MSP data is validated and refreshes only an existing viewer", function()
     local f = Fixture()
     msp.char["Alice-Realm"] = {field = {
         NA = "Alice", NT = "the Ranger", RA = "Human", FC = "Rogue", CU = "Watching the road",
@@ -116,7 +117,11 @@ Test("received MSP data is validated, isolated, and opened in the existing viewe
     Check(entry.source, "MSP")
     Check(entry.profile.rpName, "Alice")
     Check(entry.profile.status, "OOC")
-    Check(f.opened, "Alice-Realm")
+    Check(f.opened, nil)
+    Check(f.refreshed, nil)
+    f.viewing = "Alice-Realm"
+    Check(f.msp:OnReceived("Alice-Realm"), true)
+    Check(f.refreshed, "Alice-Realm")
 end)
 
 Test("malformed MSP fields are rejected and never replace local identity", function()

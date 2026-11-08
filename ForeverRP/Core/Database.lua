@@ -42,6 +42,15 @@ local CHARACTER_DEFAULTS = {
     profileApprovals = {},
 }
 
+local function IsNotificationSoundChoice(choice)
+    for _, sound in ipairs(Addon.Constants.NOTIFICATION_SOUND_CHOICES) do
+        if sound.value == choice then
+            return true
+        end
+    end
+    return false
+end
+
 Addon.Database = {}
 
 local function MergeDefaults(target, defaults)
@@ -139,7 +148,7 @@ function Addon.Database:Initialize()
     if notifications.soundChannel ~= "Master" and notifications.soundChannel ~= "SFX" then
         notifications.soundChannel = "Master"
     end
-    if notifications.soundChoice ~= "bingbong" and notifications.soundChoice ~= "none" then
+    if not IsNotificationSoundChoice(notifications.soundChoice) then
         notifications.soundChoice = "drumroll"
     end
     if type(notifications.chat) ~= "boolean" then
@@ -409,7 +418,7 @@ function Addon.Database:SetActivitySetting(key, value)
 end
 
 function Addon.Database:SetNotificationSoundChoice(choice)
-    if choice ~= "bingbong" and choice ~= "drumroll" and choice ~= "none" then return false end
+    if not IsNotificationSoundChoice(choice) then return false end
     self:GetNotificationSettings().soundChoice = choice
     return true
 end

@@ -234,11 +234,7 @@ function MSP:OnReceived(sender)
         return false
     end
     if Addon.ProfileViewer then
-        if Addon.RemoteProfiles:HasProfile(characterKey, false) then
-            Addon.ProfileViewer:RefreshIfViewing(characterKey)
-        elseif not Addon.ProfileTransfer or not Addon.ProfileTransfer:IsRequestPending(characterKey, false) then
-            Addon.ProfileViewer:ShowMSP(characterKey)
-        end
+        Addon.ProfileViewer:RefreshIfViewing(characterKey)
     end
     return true
 end
